@@ -1,0 +1,27 @@
+# Workspace harness / local tooling
+terminals/
+chromedriver/
+.flutter-sdk/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE (workspace root)
+.idea/
+.vscode/
+*.iml
+
+# Flutter app — delegate platform/build rules to yuque_notes/.gitignore
+# (listed here for visibility when browsing repo root)
+yuque_notes/.dart_tool/
+yuque_notes/build/
+yuque_notes/.flutter-plugins
+yuque_notes/.flutter-plugins-dependencies
+yuque_notes/.pub-cache/
+yuque_notes/.pub/
+yuque_notes/coverage/
+yuque_notes/android/local.properties
+yuque_notes/android/.gradle/
+yuque_notes/windows/flutter/ephemeral/
