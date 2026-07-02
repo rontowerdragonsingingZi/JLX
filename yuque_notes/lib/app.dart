@@ -3,13 +3,16 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 import 'data/models/user.dart';
-import 'screens/auth/login_screen.dart';
 import 'screens/workspace/workspace_screen.dart';
+import 'services/cloud_auth_api.dart';
+import 'services/local_user_service.dart';
 import 'services/session_service.dart';
 import 'theme/app_theme.dart';
 
 class YuqueNotesApp extends StatefulWidget {
-  const YuqueNotesApp({super.key});
+  const YuqueNotesApp({super.key, this.cloudAuthApi});
+
+  final CloudAuthApi? cloudAuthApi;
 
   @override
   State<YuqueNotesApp> createState() => _YuqueNotesAppState();
@@ -17,31 +20,45 @@ class YuqueNotesApp extends StatefulWidget {
 
 class _YuqueNotesAppState extends State<YuqueNotesApp> {
   final _sessionService = SessionService();
+  final _localUserService = LocalUserService();
   Widget _home = const _SplashScreen();
+  User? _localUser;
+  User? _cloudUser;
 
   @override
   void initState() {
     super.initState();
-    _resolveInitialRoute();
+    _bootstrap();
   }
 
-  Future<void> _resolveInitialRoute() async {
-    final userId = await _sessionService.getUserId();
-    final username = await _sessionService.getUsername();
+  Future<void> _bootstrap() async {
+    final localUser = await _localUserService.ensureLocalUser();
+    final cloudSession = await _sessionService.getCloudSession();
     if (!mounted) {
       return;
     }
     setState(() {
-      if (userId != null && username != null) {
+      _localUser = localUser;
+      _cloudUser = cloudSession?.toDisplayUser();
+      _home = WorkspaceScreen(
+        localUser: localUser,
+        cloudUser: _cloudUser,
+        onCloudAuthChanged: _onCloudAuthChanged,
+        cloudAuthApi: widget.cloudAuthApi,
+      );
+    });
+  }
+
+  void _onCloudAuthChanged(User? cloudUser) {
+    setState(() {
+      _cloudUser = cloudUser;
+      if (_localUser != null) {
         _home = WorkspaceScreen(
-          user: User(
-            id: userId,
-            username: username,
-            createdAt: DateTime.now(),
-          ),
+          localUser: _localUser!,
+          cloudUser: _cloudUser,
+          onCloudAuthChanged: _onCloudAuthChanged,
+          cloudAuthApi: widget.cloudAuthApi,
         );
-      } else {
-        _home = const LoginScreen();
       }
     });
   }

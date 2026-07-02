@@ -56,4 +56,24 @@ void main() {
     expect(hash1, hash2);
     expect(hash1, isNot(equals(authRepository.hashPassword('other'))));
   });
+
+  test('updateAvatar persists and reloads via getUserById and login', () async {
+    final user = await authRepository.register(
+      username: 'dave',
+      password: 'secret',
+    );
+    expect(user.avatar, isNull);
+
+    const avatar = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z5BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    await authRepository.updateAvatar(userId: user.id, avatar: avatar);
+
+    final reloaded = await authRepository.getUserById(user.id);
+    expect(reloaded?.avatar, avatar);
+
+    final loggedIn = await authRepository.login(
+      username: 'dave',
+      password: 'secret',
+    );
+    expect(loggedIn.avatar, avatar);
+  });
 }

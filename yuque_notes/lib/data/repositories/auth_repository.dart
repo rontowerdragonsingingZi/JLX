@@ -9,6 +9,8 @@ class AuthRepository {
   AuthRepository({DatabaseHelper? databaseHelper})
       : _databaseHelper = databaseHelper ?? DatabaseHelper.instance;
 
+  static const String localUsername = '__local__';
+
   final DatabaseHelper _databaseHelper;
 
   String hashPassword(String password) {
@@ -71,6 +73,60 @@ class AuthRepository {
     }
 
     return User.fromMap(rows.first);
+  }
+
+  Future<User?> getUserById(int userId) async {
+    final db = await _databaseHelper.database;
+    final rows = await db.query(
+      DatabaseHelper.usersTable,
+      where: 'id = ?',
+      whereArgs: [userId],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    return User.fromMap(rows.first);
+  }
+
+  Future<User> ensureLocalUser() async {
+    final db = await _databaseHelper.database;
+    final rows = await db.query(
+      DatabaseHelper.usersTable,
+      where: 'username = ?',
+      whereArgs: [localUsername],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) {
+      return User.fromMap(rows.first);
+    }
+
+    final now = DateTime.now().toIso8601String();
+    final id = await db.insert(
+      DatabaseHelper.usersTable,
+      {
+        'username': localUsername,
+        'password_hash': '',
+        'created_at': now,
+      },
+    );
+    return User(id: id, username: '本地', createdAt: DateTime.parse(now));
+  }
+
+  Future<void> updateAvatar({
+    required int userId,
+    required String? avatar,
+  }) async {
+    final db = await _databaseHelper.database;
+    final updated = await db.update(
+      DatabaseHelper.usersTable,
+      {'avatar': avatar},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    if (updated == 0) {
+      throw AuthException('用户不存在');
+    }
   }
 }
 
