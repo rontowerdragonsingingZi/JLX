@@ -4,10 +4,12 @@ import '../../data/models/cloud_session.dart';
 import '../../data/models/document.dart';
 import '../../data/models/folder.dart';
 import '../../data/models/user.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/document_repository.dart';
 import '../../data/repositories/folder_repository.dart';
 import '../../services/avatar_service.dart';
 import '../../services/cloud_auth_api.dart';
+import '../../services/community_sync_service.dart';
 import '../../services/session_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/document_editor_panel.dart';
@@ -24,14 +26,19 @@ class WorkspaceScreen extends StatefulWidget {
     this.cloudUser,
     CloudAuthApi? cloudAuthApi,
     AvatarService? avatarService,
+    CommunitySyncService? communitySyncService,
+    this.initialSelectedDocument,
   })  : _cloudAuthApi = cloudAuthApi,
-        _avatarService = avatarService;
+        _avatarService = avatarService,
+        _communitySyncService = communitySyncService;
 
   final User localUser;
   final User? cloudUser;
-  final void Function(User? cloudUser) onCloudAuthChanged;
+  final Document? initialSelectedDocument;
+  final Future<void> Function(User? cloudUser) onCloudAuthChanged;
   final CloudAuthApi? _cloudAuthApi;
   final AvatarService? _avatarService;
+  final CommunitySyncService? _communitySyncService;
 
   @override
   State<WorkspaceScreen> createState() => _WorkspaceScreenState();
@@ -42,6 +49,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   final _documentRepository = DocumentRepository();
   late final AvatarService _avatarService =
       widget._avatarService ?? AvatarService();
+  late final CommunitySyncService _communitySyncService =
+      widget._communitySyncService ?? CommunitySyncService();
   final _sessionService = SessionService();
 
   List<Folder> _folders = [];
@@ -55,11 +64,21 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   bool get _isCloudLoggedIn => widget.cloudUser != null;
 
+  bool get _canSyncDocument =>
+      _isCloudLoggedIn && !AuthRepository.isLocalGuest(widget.localUser);
+
   @override
   void initState() {
     super.initState();
     _avatar = widget.cloudUser?.avatar;
-    _loadTree();
+    final initialDocument = widget.initialSelectedDocument;
+    if (initialDocument != null) {
+      _selectedDocument = initialDocument;
+      _selectedFolderId = initialDocument.folderId;
+      _loading = false;
+    } else {
+      _loadTree();
+    }
   }
 
   @override
@@ -248,7 +267,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     if (!mounted) {
       return;
     }
-    widget.onCloudAuthChanged(session.toDisplayUser());
+    await widget.onCloudAuthChanged(session.toDisplayUser());
   }
 
   Future<void> _pickAvatar() async {
@@ -270,7 +289,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
     setState(() => _avatar = result.dataUri);
     final cloudUser = widget.cloudUser!;
-    widget.onCloudAuthChanged(
+    await widget.onCloudAuthChanged(
       User(
         id: cloudUser.id,
         username: cloudUser.username,
@@ -280,12 +299,76 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     );
   }
 
+  Future<void> _syncDocumentToCommunity() async {
+    if (_selectedDocument == null) {
+      return;
+    }
+
+    if (!_isCloudLoggedIn) {
+      if (mounted) {
+        _showError('请先登录社区账号');
+      }
+      return;
+    }
+
+    if (!_canSyncDocument) {
+      if (mounted) {
+        _showError('当前为本地游客笔记，请登录社区账号后创建文档再同步');
+      }
+      return;
+    }
+
+    var session = await _sessionService.getCloudSession();
+    if (session == null) {
+      if (mounted) {
+        _showError('请先登录社区账号');
+      }
+      return;
+    }
+
+    try {
+      await _syncDocumentWithSession(session.accessToken);
+    } on CommunitySyncException catch (error) {
+      if (error.statusCode == 401 && widget._cloudAuthApi != null) {
+        final refreshed = await _sessionService.refreshCloudSession(
+          widget._cloudAuthApi!,
+        );
+        if (refreshed != null && refreshed.accessToken != session.accessToken) {
+          try {
+            await _syncDocumentWithSession(refreshed.accessToken);
+            return;
+          } on CommunitySyncException catch (retryError) {
+            _showError(retryError.message);
+            rethrow;
+          }
+        }
+        if (!mounted) {
+          return;
+        }
+        await widget.onCloudAuthChanged(null);
+        _showError('登录已过期，请重新登录');
+        return;
+      }
+      _showError(error.message);
+      rethrow;
+    }
+  }
+
+  Future<void> _syncDocumentWithSession(String accessToken) async {
+    await _communitySyncService.syncDocumentToCommunity(
+      documentId: _selectedDocument!.id,
+      localUserId: _localUserId,
+      accessToken: accessToken,
+    );
+    await _refreshDocument(_selectedDocument!.id);
+  }
+
   Future<void> _logout() async {
     await _sessionService.clearCloudSession();
     if (!mounted) {
       return;
     }
-    widget.onCloudAuthChanged(null);
+    await widget.onCloudAuthChanged(null);
   }
 
   Widget _buildProfileSection() {
@@ -433,6 +516,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 ? DocumentEditorPanel(
                     key: ValueKey(_selectedDocument!.id),
                     document: _selectedDocument!,
+                    canSyncToCommunity: _canSyncDocument,
+                    onSyncToCommunity: _syncDocumentToCommunity,
                     onSave: (markdown) async {
                       await _documentRepository.updateDocumentContent(
                         userId: _localUserId,

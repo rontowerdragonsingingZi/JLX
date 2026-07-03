@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/models/cloud_auth_result.dart';
 import '../data/models/cloud_session.dart';
+import 'cloud_auth_api.dart';
 
 class SessionService {
   static const String _cloudTokenKey = 'cloud_access_token';
@@ -62,5 +64,36 @@ class SessionService {
 
   Future<bool> isCloudLoggedIn() async {
     return (await getCloudSession()) != null;
+  }
+
+  Future<CloudSession?> refreshCloudSession(CloudAuthApi cloudAuthApi) async {
+    final session = await getCloudSession();
+    final refreshToken = session?.refreshToken;
+    if (session == null || refreshToken == null || refreshToken.isEmpty) {
+      return session;
+    }
+
+    try {
+      final result = await cloudAuthApi.refresh(refreshToken: refreshToken);
+      final refreshed = _sessionFromAuthResult(session, result);
+      await saveCloudSession(refreshed);
+      return refreshed;
+    } on CloudAuthException {
+      await clearCloudSession();
+      return null;
+    }
+  }
+
+  CloudSession _sessionFromAuthResult(
+    CloudSession previous,
+    CloudAuthResult result,
+  ) {
+    return previous.copyWith(
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken ?? previous.refreshToken,
+      userId: result.userId,
+      username: result.username,
+      avatar: result.avatar ?? previous.avatar,
+    );
   }
 }

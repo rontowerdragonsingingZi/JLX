@@ -10,6 +10,8 @@ abstract class CloudAuthApi {
     required String username,
     required String password,
   });
+
+  Future<CloudAuthResult> refresh({required String refreshToken});
 }
 
 class CloudAuthException implements Exception {

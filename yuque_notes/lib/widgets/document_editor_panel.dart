@@ -12,10 +12,14 @@ class DocumentEditorPanel extends StatefulWidget {
     super.key,
     required this.document,
     required this.onSave,
+    this.canSyncToCommunity = false,
+    this.onSyncToCommunity,
   });
 
   final models.Document document;
   final Future<void> Function(String markdown) onSave;
+  final bool canSyncToCommunity;
+  final Future<void> Function()? onSyncToCommunity;
 
   @override
   State<DocumentEditorPanel> createState() => _DocumentEditorPanelState();
@@ -26,6 +30,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
   late FocusNode _focusNode;
   late ScrollController _scrollController;
   bool _saving = false;
+  bool _syncing = false;
   int _selectedImageWidth = defaultImageWidth;
   final Map<String, int> _imageWidths = {};
 
@@ -62,6 +67,29 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     _focusNode.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncToCommunity() async {
+    final onSync = widget.onSyncToCommunity;
+    if (onSync == null) {
+      return;
+    }
+
+    setState(() => _syncing = true);
+    try {
+      await onSync();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已同步到社区')),
+        );
+      }
+    } catch (_) {
+      // Workspace surfaces the error message.
+    } finally {
+      if (mounted) {
+        setState(() => _syncing = false);
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -201,6 +229,29 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                   ),
                 ),
               ),
+              if (widget.canSyncToCommunity) ...[
+                if (widget.document.syncedToCommunity)
+                  const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Chip(
+                      key: Key('synced_to_community_badge'),
+                      label: Text('已同步'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                TextButton.icon(
+                  key: const Key('sync_to_community_button'),
+                  onPressed: _syncing ? null : _syncToCommunity,
+                  icon: _syncing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cloud_upload_outlined, size: 18),
+                  label: const Text('同步到社区'),
+                ),
+              ],
               TextButton.icon(
                 onPressed: _saving ? null : _save,
                 icon: _saving

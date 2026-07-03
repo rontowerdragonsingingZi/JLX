@@ -39,7 +39,7 @@ class DatabaseHelper {
     }
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -78,6 +78,7 @@ class DatabaseHelper {
         content TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        synced_to_community INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES $usersTable(id),
         FOREIGN KEY (folder_id) REFERENCES $foldersTable(id)
       )
@@ -90,13 +91,18 @@ class DatabaseHelper {
         'ALTER TABLE $usersTable ADD COLUMN avatar TEXT',
       );
     }
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE $documentsTable ADD COLUMN synced_to_community INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> useInMemoryDatabase() async {
     await close();
     _database = await openDatabase(
       inMemoryDatabasePath,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );

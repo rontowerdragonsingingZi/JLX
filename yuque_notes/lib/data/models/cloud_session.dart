@@ -35,12 +35,18 @@ class CloudSession {
     );
   }
 
-  CloudSession copyWith({String? avatar}) {
+  CloudSession copyWith({
+    String? accessToken,
+    String? refreshToken,
+    int? userId,
+    String? username,
+    String? avatar,
+  }) {
     return CloudSession(
-      accessToken: accessToken,
-      refreshToken: refreshToken,
-      userId: userId,
-      username: username,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
+      userId: userId ?? this.userId,
+      username: username ?? this.username,
       avatar: avatar ?? this.avatar,
     );
   }

@@ -43,7 +43,7 @@ void main() {
         MaterialApp(
           home: WorkspaceScreen(
             localUser: localUser,
-            onCloudAuthChanged: (_) {},
+            onCloudAuthChanged: (_) async {},
           ),
         ),
       );
@@ -60,7 +60,7 @@ void main() {
           home: WorkspaceScreen(
             localUser: localUser,
             cloudUser: cloudUserWithoutAvatar,
-            onCloudAuthChanged: (_) {},
+            onCloudAuthChanged: (_) async {},
           ),
         ),
       );
@@ -77,7 +77,7 @@ void main() {
           home: WorkspaceScreen(
             localUser: localUser,
             cloudUser: cloudUserWithAvatar,
-            onCloudAuthChanged: (_) {},
+            onCloudAuthChanged: (_) async {},
           ),
         ),
       );
@@ -107,7 +107,7 @@ void main() {
           home: WorkspaceScreen(
             localUser: localUser,
             cloudUser: cloudUserWithoutAvatar,
-            onCloudAuthChanged: (user) => updatedCloudUser = user,
+            onCloudAuthChanged: (user) async => updatedCloudUser = user,
             avatarService: avatarService,
           ),
         ),

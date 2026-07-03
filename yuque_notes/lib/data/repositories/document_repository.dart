@@ -51,6 +51,25 @@ class DocumentRepository {
       content: content,
       createdAt: now,
       updatedAt: now,
+      syncedToCommunity: false,
+    );
+  }
+
+  Future<void> markSyncedToCommunity({
+    required int userId,
+    required int documentId,
+  }) async {
+    final document = await getDocument(userId: userId, documentId: documentId);
+    if (document == null) {
+      throw RepositoryException('文档不存在');
+    }
+
+    final db = await _databaseHelper.database;
+    await db.update(
+      DatabaseHelper.documentsTable,
+      {'synced_to_community': 1},
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [documentId, userId],
     );
   }
 

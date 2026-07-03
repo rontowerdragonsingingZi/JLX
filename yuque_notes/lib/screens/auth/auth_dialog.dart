@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../data/models/cloud_auth_result.dart';
 import '../../services/cloud_auth_api.dart';
-import '../../services/cloud_auth_api_stub.dart';
+import '../../services/forum/forum_cloud_auth_api.dart';
 import '../../theme/app_theme.dart';
 
 enum _AuthMode { login, register }
@@ -29,7 +29,7 @@ class AuthDialog extends StatefulWidget {
 
 class _AuthDialogState extends State<AuthDialog> {
   late final CloudAuthApi _cloudAuthApi =
-      widget._cloudAuthApi ?? UnconfiguredCloudAuthApi();
+      widget._cloudAuthApi ?? ForumCloudAuthApi();
 
   _AuthMode _mode = _AuthMode.login;
   final _usernameController = TextEditingController();

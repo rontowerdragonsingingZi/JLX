@@ -57,6 +57,28 @@ void main() {
     expect(hash1, isNot(equals(authRepository.hashPassword('other'))));
   });
 
+  test('ensureLocalUser uses stable __local__ username', () async {
+    final created = await authRepository.ensureLocalUser();
+    expect(created.username, AuthRepository.localUsername);
+
+    final reloaded = await authRepository.ensureLocalUser();
+    expect(reloaded.username, AuthRepository.localUsername);
+    expect(reloaded.id, created.id);
+  });
+
+  test('ensureCloudLinkedLocalUser creates sync-eligible local owner', () async {
+    final linked = await authRepository.ensureCloudLinkedLocalUser(
+      cloudUsername: 'alice',
+    );
+    expect(linked.username, 'alice');
+    expect(AuthRepository.isLocalGuest(linked), isFalse);
+
+    final same = await authRepository.ensureCloudLinkedLocalUser(
+      cloudUsername: 'alice',
+    );
+    expect(same.id, linked.id);
+  });
+
   test('updateAvatar persists and reloads via getUserById and login', () async {
     final user = await authRepository.register(
       username: 'dave',

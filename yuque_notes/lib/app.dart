@@ -32,34 +32,43 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
   }
 
   Future<void> _bootstrap() async {
-    final localUser = await _localUserService.ensureLocalUser();
     final cloudSession = await _sessionService.getCloudSession();
+    final localUser = await _localUserService.resolveActiveLocalUser(
+      cloudSession: cloudSession,
+    );
     if (!mounted) {
       return;
     }
     setState(() {
       _localUser = localUser;
       _cloudUser = cloudSession?.toDisplayUser();
-      _home = WorkspaceScreen(
-        localUser: localUser,
-        cloudUser: _cloudUser,
-        onCloudAuthChanged: _onCloudAuthChanged,
-        cloudAuthApi: widget.cloudAuthApi,
-      );
+      _home = _buildWorkspace();
     });
   }
 
-  void _onCloudAuthChanged(User? cloudUser) {
+  WorkspaceScreen _buildWorkspace() {
+    return WorkspaceScreen(
+      localUser: _localUser!,
+      cloudUser: _cloudUser,
+      onCloudAuthChanged: _onCloudAuthChanged,
+      cloudAuthApi: widget.cloudAuthApi,
+    );
+  }
+
+  Future<void> _onCloudAuthChanged(User? cloudUser) async {
+    final cloudSession = cloudUser == null
+        ? null
+        : await _sessionService.getCloudSession();
+    final localUser = await _localUserService.resolveActiveLocalUser(
+      cloudSession: cloudSession,
+    );
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _cloudUser = cloudUser;
-      if (_localUser != null) {
-        _home = WorkspaceScreen(
-          localUser: _localUser!,
-          cloudUser: _cloudUser,
-          onCloudAuthChanged: _onCloudAuthChanged,
-          cloudAuthApi: widget.cloudAuthApi,
-        );
-      }
+      _localUser = localUser;
+      _home = _buildWorkspace();
     });
   }
 

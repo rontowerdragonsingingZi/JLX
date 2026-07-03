@@ -7,6 +7,7 @@ class Document {
     required this.content,
     required this.createdAt,
     required this.updatedAt,
+    this.syncedToCommunity = false,
   });
 
   final int id;
@@ -16,6 +17,7 @@ class Document {
   final String content;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool syncedToCommunity;
 
   factory Document.fromMap(Map<String, dynamic> map) {
     return Document(
@@ -26,6 +28,7 @@ class Document {
       content: map['content'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
+      syncedToCommunity: (map['synced_to_community'] as int? ?? 0) == 1,
     );
   }
 
@@ -38,6 +41,7 @@ class Document {
       'content': content,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'synced_to_community': syncedToCommunity ? 1 : 0,
     };
   }
 
@@ -49,6 +53,7 @@ class Document {
     String? content,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? syncedToCommunity,
   }) {
     return Document(
       id: id ?? this.id,
@@ -58,6 +63,7 @@ class Document {
       content: content ?? this.content,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      syncedToCommunity: syncedToCommunity ?? this.syncedToCommunity,
     );
   }
 }
