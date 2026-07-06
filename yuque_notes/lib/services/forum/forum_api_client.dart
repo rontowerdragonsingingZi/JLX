@@ -26,6 +26,13 @@ class ForumApiClient {
 
   Uri uri(String path) => Uri.parse('$baseUrl$path');
 
+  Map<String, String> _headers({String? accessToken}) {
+    return <String, String>{
+      'Content-Type': 'application/json',
+      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+    };
+  }
+
   static String extractDetail(String body) {
     try {
       final decoded = jsonDecode(body);
@@ -47,7 +54,7 @@ class ForumApiClient {
     } on FormatException {
       // Fall through to generic message.
     }
-    return '请求失败';
+    return 'Request failed';
   }
 
   Future<Map<String, dynamic>> postJson(
@@ -56,17 +63,44 @@ class ForumApiClient {
     String? accessToken,
     List<int> expectedStatusCodes = const [200],
   }) async {
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      if (accessToken != null) 'Authorization': 'Bearer $accessToken',
-    };
-
     final response = await _client.post(
       uri(path),
-      headers: headers,
+      headers: _headers(accessToken: accessToken),
       body: body == null ? null : jsonEncode(body),
     );
+    return _decodeResponse(response, expectedStatusCodes);
+  }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Map<String, dynamic>? body,
+    String? accessToken,
+    List<int> expectedStatusCodes = const [200],
+  }) async {
+    final response = await _client.patch(
+      uri(path),
+      headers: _headers(accessToken: accessToken),
+      body: body == null ? null : jsonEncode(body),
+    );
+    return _decodeResponse(response, expectedStatusCodes);
+  }
+
+  Future<void> delete(
+    String path, {
+    String? accessToken,
+    List<int> expectedStatusCodes = const [204],
+  }) async {
+    final response = await _client.delete(
+      uri(path),
+      headers: _headers(accessToken: accessToken),
+    );
+    _decodeResponse(response, expectedStatusCodes);
+  }
+
+  Map<String, dynamic> _decodeResponse(
+    http.Response response,
+    List<int> expectedStatusCodes,
+  ) {
     if (!expectedStatusCodes.contains(response.statusCode)) {
       throw ForumApiException(
         extractDetail(response.body),
@@ -82,6 +116,6 @@ class ForumApiClient {
     if (decoded is Map<String, dynamic>) {
       return decoded;
     }
-    throw ForumApiException('响应格式无效', statusCode: response.statusCode);
+    throw ForumApiException('Unexpected response', statusCode: response.statusCode);
   }
 }

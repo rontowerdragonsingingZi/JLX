@@ -48,6 +48,7 @@ class _SidebarTreeState extends State<SidebarTree> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final roots = _childrenOf(null);
     return Column(
       children: [
@@ -67,22 +68,22 @@ class _SidebarTreeState extends State<SidebarTree> {
         ),
         Expanded(
           child: roots.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     '暂无内容，请创建文件夹',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: colors.textSecondary),
                   ),
                 )
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  children: roots.map(_buildFolderNode).toList(),
+                  children: roots.map((folder) => _buildFolderNode(folder, colors)).toList(),
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildFolderNode(Folder folder) {
+  Widget _buildFolderNode(Folder folder, AppThemeColors colors) {
     final children = _childrenOf(folder.id);
     final documents = widget.documentsByFolder[folder.id] ?? [];
     final isExpanded = _expandedFolderIds.contains(folder.id);
@@ -93,7 +94,7 @@ class _SidebarTreeState extends State<SidebarTree> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Material(
-          color: isSelected ? AppColors.selected : Colors.transparent,
+          color: isSelected ? colors.selected : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
           child: InkWell(
             borderRadius: BorderRadius.circular(4),
@@ -116,9 +117,9 @@ class _SidebarTreeState extends State<SidebarTree> {
                         ? Icons.keyboard_arrow_down
                         : Icons.keyboard_arrow_right,
                     size: 18,
-                    color: AppColors.textSecondary,
+                    color: colors.textSecondary,
                   ),
-                  const Icon(Icons.folder_outlined, size: 18, color: AppColors.textSecondary),
+                  Icon(Icons.folder_outlined, size: 18, color: colors.textSecondary),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -128,6 +129,7 @@ class _SidebarTreeState extends State<SidebarTree> {
                     ),
                   ),
                   _buildMenu(
+                    colors: colors,
                     onRename: () async {
                       final name = await showNameDialog(
                         context: context,
@@ -152,13 +154,13 @@ class _SidebarTreeState extends State<SidebarTree> {
           ...children.map(
             (child) => Padding(
               padding: const EdgeInsets.only(left: 16),
-              child: _buildFolderNode(child),
+              child: _buildFolderNode(child, colors),
             ),
           ),
           ...documents.map(
             (doc) => Padding(
               padding: const EdgeInsets.only(left: 24),
-              child: _buildDocumentTile(doc),
+              child: _buildDocumentTile(doc, colors),
             ),
           ),
         ],
@@ -166,10 +168,10 @@ class _SidebarTreeState extends State<SidebarTree> {
     );
   }
 
-  Widget _buildDocumentTile(Document document) {
+  Widget _buildDocumentTile(Document document, AppThemeColors colors) {
     final isSelected = widget.selectedDocumentId == document.id;
     return Material(
-      color: isSelected ? AppColors.selected : Colors.transparent,
+      color: isSelected ? colors.selected : Colors.transparent,
       borderRadius: BorderRadius.circular(4),
       child: InkWell(
         borderRadius: BorderRadius.circular(4),
@@ -181,7 +183,7 @@ class _SidebarTreeState extends State<SidebarTree> {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           child: Row(
             children: [
-              const Icon(Icons.description_outlined, size: 18, color: AppColors.textSecondary),
+              Icon(Icons.description_outlined, size: 18, color: colors.textSecondary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -191,6 +193,7 @@ class _SidebarTreeState extends State<SidebarTree> {
                 ),
               ),
               _buildMenu(
+                colors: colors,
                 onRename: () async {
                   final name = await showNameDialog(
                     context: context,
@@ -212,13 +215,14 @@ class _SidebarTreeState extends State<SidebarTree> {
   }
 
   Widget _buildMenu({
+    required AppThemeColors colors,
     required VoidCallback onRename,
     required VoidCallback onDelete,
     VoidCallback? onAddFolder,
     VoidCallback? onAddDocument,
   }) {
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_horiz, size: 18, color: AppColors.textSecondary),
+      icon: Icon(Icons.more_horiz, size: 18, color: colors.textSecondary),
       padding: EdgeInsets.zero,
       onSelected: (value) {
         switch (value) {

@@ -43,33 +43,72 @@ void main() {
       expect(result.avatar, isNull);
     });
 
-    test('register surfaces FastAPI detail errors', () async {
+    test('register sends email verification fields', () async {
       final client = ForumApiClient(
         baseUrl: 'https://forum.test',
         client: MockClient((request) async {
-          return jsonUtf8Response({'detail': '用户名已存在'}, 409);
+          expect(request.url.path, '/api/auth/register');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['username'], 'alice');
+          expect(body['password'], 'secret123');
+          expect(body['email'], 'alice@example.com');
+          expect(body['verificationCode'], '123456');
+          return http.Response(
+            jsonEncode({
+              'accessToken': 'access',
+              'refreshToken': 'refresh',
+              'userId': 7,
+              'username': 'alice',
+              'avatar': null,
+            }),
+            200,
+          );
         }),
       );
 
       final api = ForumCloudAuthApi(client: client);
-
-      await expectLater(
-        api.register(username: 'alice', password: 'secret123'),
-        throwsA(
-          isA<CloudAuthException>().having(
-            (error) => error.message,
-            'message',
-            '用户名已存在',
-          ),
-        ),
+      final result = await api.register(
+        username: 'alice',
+        password: 'secret123',
+        email: 'alice@example.com',
+        verificationCode: '123456',
       );
+
+      expect(result.accessToken, 'access');
+      expect(result.refreshToken, 'refresh');
+      expect(result.userId, 7);
+      expect(result.username, 'alice');
+    });
+
+    test('sendVerificationCode parses retry seconds', () async {
+      final client = ForumApiClient(
+        baseUrl: 'https://forum.test',
+        client: MockClient((request) async {
+          expect(request.url.path, '/api/auth/send-verification-code');
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          expect(body['email'], 'alice@example.com');
+          return http.Response(
+            jsonEncode({
+              'message': 'sent',
+              'retryAfterSeconds': 60,
+            }),
+            200,
+          );
+        }),
+      );
+
+      final api = ForumCloudAuthApi(client: client);
+      final retryAfterSeconds =
+          await api.sendVerificationCode(email: 'alice@example.com');
+
+      expect(retryAfterSeconds, 60);
     });
 
     test('login surfaces 401 detail errors', () async {
       final client = ForumApiClient(
         baseUrl: 'https://forum.test',
         client: MockClient((request) async {
-          return jsonUtf8Response({'detail': '用户名或密码错误'}, 401);
+          return jsonUtf8Response({'detail': 'Invalid credentials'}, 401);
         }),
       );
 
@@ -81,7 +120,7 @@ void main() {
           isA<CloudAuthException>().having(
             (error) => error.message,
             'message',
-            '用户名或密码错误',
+            'Invalid credentials',
           ),
         ),
       );

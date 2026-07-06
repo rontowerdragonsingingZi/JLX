@@ -16,7 +16,7 @@ class DocumentRepository {
   }) async {
     final trimmed = title.trim();
     if (trimmed.isEmpty) {
-      throw RepositoryException('文档标题不能为空');
+      throw RepositoryException('Document title is required');
     }
 
     final db = await _databaseHelper.database;
@@ -27,7 +27,7 @@ class DocumentRepository {
       limit: 1,
     );
     if (folderRows.isEmpty) {
-      throw RepositoryException('目标文件夹不存在');
+      throw RepositoryException('Folder not found');
     }
 
     final now = DateTime.now();
@@ -40,6 +40,7 @@ class DocumentRepository {
         'content': content,
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
+        'synced_to_community': 0,
       },
     );
 
@@ -61,7 +62,7 @@ class DocumentRepository {
   }) async {
     final document = await getDocument(userId: userId, documentId: documentId);
     if (document == null) {
-      throw RepositoryException('文档不存在');
+      throw RepositoryException('Document not found');
     }
 
     final db = await _databaseHelper.database;
@@ -111,7 +112,7 @@ class DocumentRepository {
   }) async {
     final document = await getDocument(userId: userId, documentId: documentId);
     if (document == null) {
-      throw RepositoryException('文档不存在');
+      throw RepositoryException('Document not found');
     }
 
     final now = DateTime.now();
@@ -121,12 +122,17 @@ class DocumentRepository {
       {
         'content': content,
         'updated_at': now.toIso8601String(),
+        'synced_to_community': 0,
       },
       where: 'id = ? AND user_id = ?',
       whereArgs: [documentId, userId],
     );
 
-    return document.copyWith(content: content, updatedAt: now);
+    return document.copyWith(
+      content: content,
+      updatedAt: now,
+      syncedToCommunity: false,
+    );
   }
 
   Future<Document> renameDocument({
@@ -136,12 +142,12 @@ class DocumentRepository {
   }) async {
     final trimmed = title.trim();
     if (trimmed.isEmpty) {
-      throw RepositoryException('文档标题不能为空');
+      throw RepositoryException('Document title is required');
     }
 
     final document = await getDocument(userId: userId, documentId: documentId);
     if (document == null) {
-      throw RepositoryException('文档不存在');
+      throw RepositoryException('Document not found');
     }
 
     final now = DateTime.now();
@@ -151,12 +157,17 @@ class DocumentRepository {
       {
         'title': trimmed,
         'updated_at': now.toIso8601String(),
+        'synced_to_community': 0,
       },
       where: 'id = ? AND user_id = ?',
       whereArgs: [documentId, userId],
     );
 
-    return document.copyWith(title: trimmed, updatedAt: now);
+    return document.copyWith(
+      title: trimmed,
+      updatedAt: now,
+      syncedToCommunity: false,
+    );
   }
 
   Future<void> deleteDocument({
@@ -165,7 +176,7 @@ class DocumentRepository {
   }) async {
     final document = await getDocument(userId: userId, documentId: documentId);
     if (document == null) {
-      throw RepositoryException('文档不存在');
+      throw RepositoryException('Document not found');
     }
 
     final db = await _databaseHelper.database;

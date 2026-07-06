@@ -39,15 +39,15 @@ class CommunitySyncService {
       documentId: documentId,
     );
     if (document == null) {
-      throw CommunitySyncException('文档不存在');
+      throw CommunitySyncException('Document not found');
     }
 
     final owner = await _authRepository.getUserById(document.userId);
     if (owner == null) {
-      throw CommunitySyncException('文档所属用户不存在');
+      throw CommunitySyncException('Document owner not found');
     }
-    if (owner.username == AuthRepository.localUsername) {
-      throw CommunitySyncException('本地游客文档无法同步到社区');
+    if (AuthRepository.isLocalGuest(owner)) {
+      throw CommunitySyncException('Local guest documents cannot be synced');
     }
 
     final folder = await _folderRepository.getFolder(
@@ -81,5 +81,22 @@ class CommunitySyncService {
       userId: document.userId,
       documentId: document.id,
     );
+  }
+
+  Future<void> deleteCommunityPost({
+    required int postId,
+    required String accessToken,
+  }) async {
+    try {
+      await _forumClient.delete(
+        '/api/posts/$postId',
+        accessToken: accessToken,
+      );
+    } on ForumApiException catch (error) {
+      throw CommunitySyncException(
+        error.message,
+        statusCode: error.statusCode,
+      );
+    }
   }
 }

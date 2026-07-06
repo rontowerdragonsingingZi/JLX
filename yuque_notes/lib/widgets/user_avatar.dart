@@ -19,18 +19,19 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
     final image = _avatarImage(avatar);
     final avatarWidget = CircleAvatar(
       key: const Key('user_avatar'),
       radius: radius,
-      backgroundColor: AppColors.border,
+      backgroundColor: colors.border,
       backgroundImage: image,
       child: image == null
           ? Icon(
               Icons.person,
               key: const Key('user_avatar_default'),
               size: radius,
-              color: AppColors.textSecondary,
+              color: colors.textSecondary,
             )
           : null,
     );

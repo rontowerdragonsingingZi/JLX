@@ -9,9 +9,18 @@ abstract class CloudAuthApi {
   Future<CloudAuthResult> register({
     required String username,
     required String password,
+    required String email,
+    required String verificationCode,
   });
 
+  Future<int?> sendVerificationCode({required String email});
+
   Future<CloudAuthResult> refresh({required String refreshToken});
+
+  Future<String?> updateAvatar({
+    required String accessToken,
+    required String? avatar,
+  });
 }
 
 class CloudAuthException implements Exception {

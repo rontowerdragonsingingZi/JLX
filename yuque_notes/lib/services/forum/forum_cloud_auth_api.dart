@@ -12,7 +12,7 @@ class ForumCloudAuthApi implements CloudAuthApi {
   Future<CloudAuthResult> login({
     required String username,
     required String password,
-  }) async {
+  }) {
     return _authenticate(
       path: '/api/auth/login',
       username: username,
@@ -24,12 +24,36 @@ class ForumCloudAuthApi implements CloudAuthApi {
   Future<CloudAuthResult> register({
     required String username,
     required String password,
-  }) async {
+    required String email,
+    required String verificationCode,
+  }) {
     return _authenticate(
       path: '/api/auth/register',
       username: username,
       password: password,
+      email: email,
+      verificationCode: verificationCode,
     );
+  }
+
+  @override
+  Future<int?> sendVerificationCode({required String email}) async {
+    try {
+      final json = await _client.postJson(
+        '/api/auth/send-verification-code',
+        body: {'email': email.trim()},
+      );
+      final retryAfterSeconds = json['retryAfterSeconds'];
+      if (retryAfterSeconds == null) {
+        return null;
+      }
+      if (retryAfterSeconds is num) {
+        return retryAfterSeconds.toInt();
+      }
+      throw CloudAuthException('Unexpected verification response');
+    } on ForumApiException catch (error) {
+      throw CloudAuthException(error.message);
+    }
   }
 
   @override
@@ -45,10 +69,33 @@ class ForumCloudAuthApi implements CloudAuthApi {
     }
   }
 
+  @override
+  Future<String?> updateAvatar({
+    required String accessToken,
+    required String? avatar,
+  }) async {
+    try {
+      final json = await _client.patchJson(
+        '/api/users/me/avatar',
+        accessToken: accessToken,
+        body: {'avatar': avatar},
+      );
+      final updatedAvatar = json['avatar'];
+      if (updatedAvatar == null || updatedAvatar is String) {
+        return updatedAvatar as String?;
+      }
+      throw CloudAuthException('Unexpected avatar response');
+    } on ForumApiException catch (error) {
+      throw CloudAuthException(error.message);
+    }
+  }
+
   Future<CloudAuthResult> _authenticate({
     required String path,
     required String username,
     required String password,
+    String? email,
+    String? verificationCode,
   }) async {
     try {
       final json = await _client.postJson(
@@ -56,6 +103,9 @@ class ForumCloudAuthApi implements CloudAuthApi {
         body: {
           'username': username.trim(),
           'password': password,
+          if (email != null) 'email': email.trim(),
+          if (verificationCode != null)
+            'verificationCode': verificationCode.trim(),
         },
       );
       return _parseAuthResult(json);
@@ -68,10 +118,8 @@ class ForumCloudAuthApi implements CloudAuthApi {
     final accessToken = json['accessToken'];
     final userId = json['userId'];
     final username = json['username'];
-    if (accessToken is! String ||
-        userId is! num ||
-        username is! String) {
-      throw CloudAuthException('认证响应格式无效');
+    if (accessToken is! String || userId is! num || username is! String) {
+      throw CloudAuthException('Unexpected auth response');
     }
 
     return CloudAuthResult(

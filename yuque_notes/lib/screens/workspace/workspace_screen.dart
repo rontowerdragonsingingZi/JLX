@@ -12,6 +12,7 @@ import '../../services/cloud_auth_api.dart';
 import '../../services/community_sync_service.dart';
 import '../../services/session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_logo.dart';
 import '../../widgets/document_editor_panel.dart';
 import '../../widgets/name_dialog.dart';
 import '../../widgets/sidebar_tree.dart';
@@ -28,6 +29,8 @@ class WorkspaceScreen extends StatefulWidget {
     AvatarService? avatarService,
     CommunitySyncService? communitySyncService,
     this.initialSelectedDocument,
+    this.themeMode = ThemeMode.light,
+    this.onToggleTheme,
   })  : _cloudAuthApi = cloudAuthApi,
         _avatarService = avatarService,
         _communitySyncService = communitySyncService;
@@ -35,6 +38,8 @@ class WorkspaceScreen extends StatefulWidget {
   final User localUser;
   final User? cloudUser;
   final Document? initialSelectedDocument;
+  final ThemeMode themeMode;
+  final VoidCallback? onToggleTheme;
   final Future<void> Function(User? cloudUser) onCloudAuthChanged;
   final CloudAuthApi? _cloudAuthApi;
   final AvatarService? _avatarService;
@@ -283,7 +288,24 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       return;
     }
 
-    await _sessionService.updateCloudAvatar(result.dataUri);
+    var session = await _sessionService.getCloudSession();
+    if (session == null) {
+      if (mounted) {
+        _showError('Please sign in first');
+      }
+      return;
+    }
+
+    try {
+      final updatedAvatar = await widget._cloudAuthApi?.updateAvatar(
+        accessToken: session.accessToken,
+        avatar: result.dataUri,
+      );
+      await _sessionService.updateCloudAvatar(updatedAvatar ?? result.dataUri);
+    } on CloudAuthException catch (error) {
+      _showError(error.message);
+      return;
+    }
     if (!mounted) {
       return;
     }
@@ -372,6 +394,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   Widget _buildProfileSection() {
+    final colors = context.appColors;
     if (!_isCloudLoggedIn) {
       return InkWell(
         key: const Key('guest_login_prompt'),
@@ -381,19 +404,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.account_circle_outlined,
                 size: 36,
-                color: AppColors.textSecondary,
+                color: colors.textSecondary,
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
                   '请登录',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: AppColors.primary,
+                    color: colors.primary,
                   ),
                 ),
               ),
@@ -423,11 +446,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
-              const Text(
+              Text(
                 '点击头像更换',
                 style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textSecondary,
+                  color: colors.textSecondary,
                 ),
               ),
             ],
@@ -439,15 +462,18 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appColors;
+    final isDark = widget.themeMode == ThemeMode.dark;
+
     return Scaffold(
       body: Row(
         children: [
           SizedBox(
             width: 280,
             child: Container(
-              decoration: const BoxDecoration(
-                color: AppColors.sidebar,
-                border: Border(right: BorderSide(color: AppColors.border)),
+              decoration: BoxDecoration(
+                color: colors.sidebar,
+                border: Border(right: BorderSide(color: colors.border)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -456,7 +482,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.menu_book_outlined, color: AppColors.primary),
+                        const AppLogo(size: 44),
                         const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
@@ -466,6 +492,17 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
+                        ),
+                        IconButton(
+                          key: const Key('theme_toggle_button'),
+                          icon: Icon(
+                            isDark
+                                ? Icons.light_mode_outlined
+                                : Icons.dark_mode_outlined,
+                            size: 20,
+                          ),
+                          tooltip: isDark ? '日间模式' : '黑夜模式',
+                          onPressed: widget.onToggleTheme,
                         ),
                         if (_isCloudLoggedIn)
                           IconButton(
@@ -540,15 +577,16 @@ class _WelcomePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    final colors = context.appColors;
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.description_outlined, size: 64, color: AppColors.textSecondary),
-          SizedBox(height: 16),
+          const AppLogo(size: 140),
+          const SizedBox(height: 16),
           Text(
             '选择或创建一个文档开始记录',
-            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+            style: TextStyle(fontSize: 16, color: colors.textSecondary),
           ),
         ],
       ),
