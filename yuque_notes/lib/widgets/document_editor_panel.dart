@@ -281,51 +281,62 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     return actions;
   }
 
-  /// Windows：完整 Quill 工具条（可用鼠标悬停看说明）。
+  /// Windows / 宽屏：完整 Quill 工具条（可用鼠标悬停看说明）。
   Widget _buildDesktopToolbar(AppThemeColors colors) {
     return Material(
       color: colors.sidebar,
-      child: QuillSimpleToolbar(
-        controller: _controller,
-        config: QuillSimpleToolbarConfig(
-          multiRowsDisplay: true,
-          showFontFamily: false,
-          showFontSize: true,
-          showSearchButton: false,
-          showSubscript: false,
-          showSuperscript: false,
-          showCodeBlock: false,
-          showQuote: true,
-          showInlineCode: false,
-          showColorButton: true,
-          showBackgroundColorButton: false,
-          showClearFormat: true,
-          showHeaderStyle: false,
-          showLink: false,
-          showUndo: true,
-          showRedo: true,
-          showBoldButton: true,
-          showItalicButton: true,
-          showUnderLineButton: true,
-          showStrikeThrough: true,
-          showListNumbers: true,
-          showListBullets: true,
-          showIndent: true,
-          customButtons: [
-            QuillToolbarCustomButtonOptions(
-              icon: const Icon(Icons.image_outlined, size: 20),
-              tooltip: '插入图片',
-              onPressed: _insertImage,
-            ),
-            QuillToolbarCustomButtonOptions(
-              icon: const Icon(
-                Icons.photo_size_select_large_outlined,
-                size: 20,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.sidebar,
+          border: Border(
+            bottom: BorderSide(color: colors.border),
+          ),
+        ),
+        child: QuillSimpleToolbar(
+          controller: _controller,
+          config: QuillSimpleToolbarConfig(
+            multiRowsDisplay: true,
+            color: colors.sidebar,
+            sectionDividerColor: colors.border,
+            decoration: BoxDecoration(color: colors.sidebar),
+            showFontFamily: false,
+            showFontSize: true,
+            showSearchButton: false,
+            showSubscript: false,
+            showSuperscript: false,
+            showCodeBlock: false,
+            showQuote: true,
+            showInlineCode: false,
+            showColorButton: true,
+            showBackgroundColorButton: false,
+            showClearFormat: true,
+            showHeaderStyle: false,
+            showLink: false,
+            showUndo: true,
+            showRedo: true,
+            showBoldButton: true,
+            showItalicButton: true,
+            showUnderLineButton: true,
+            showStrikeThrough: true,
+            showListNumbers: true,
+            showListBullets: true,
+            showIndent: true,
+            customButtons: [
+              QuillToolbarCustomButtonOptions(
+                icon: const Icon(Icons.image_outlined, size: 20),
+                tooltip: '插入图片',
+                onPressed: _insertImage,
               ),
-              tooltip: '调整图片大小',
-              onPressed: _resizeSelectedImage,
-            ),
-          ],
+              QuillToolbarCustomButtonOptions(
+                icon: const Icon(
+                  Icons.photo_size_select_large_outlined,
+                  size: 20,
+                ),
+                tooltip: '调整图片大小',
+                onPressed: _resizeSelectedImage,
+              ),
+            ],
+          ),
         ),
       ),
     );

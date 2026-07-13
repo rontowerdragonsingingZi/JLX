@@ -1,5 +1,5 @@
 name: yuque_notes
-description: A Yuque-style note-taking app with nested folders and markdown documents.
+description: NoteYourNeed - note-taking app with nested folders and markdown documents.
 publish_to: 'none'
 version: 1.0.0+1
 

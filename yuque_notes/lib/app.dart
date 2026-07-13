@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import 'app_branding.dart';
 import 'data/models/user.dart';
 import 'screens/workspace/workspace_screen.dart';
 import 'services/cloud_auth_api.dart';
@@ -80,8 +81,9 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
 
   @override
   Widget build(BuildContext context) {
+    // theme / darkTheme 对 Windows 与 Android 同时生效，无平台分支。
     return MaterialApp(
-      title: '语雀笔记',
+      title: AppBranding.fullName,
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),

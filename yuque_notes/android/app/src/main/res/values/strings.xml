@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 手机桌面图标下显示短名 NN；应用内标题为 NoteYourNeed -->
+    <string name="app_name">NN</string>
+</resources>

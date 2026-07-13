@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app_branding.dart';
 import '../../data/models/cloud_auth_result.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/forum/forum_cloud_auth_api.dart';
@@ -166,7 +167,7 @@ class _AuthDialogState extends State<AuthDialog> {
               Center(child: AppLogo(size: compact ? 64 : 88)),
               const SizedBox(height: 16),
               Text(
-                isLogin ? '登录云端论坛' : '注册云端论坛',
+                isLogin ? AppBranding.loginTitle : AppBranding.registerTitle,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -218,6 +219,7 @@ class _AuthDialogState extends State<AuthDialog> {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: _sendingCode ? null : _sendVerificationCode,
+                      style: buildAppOutlinedButtonStyle(colors),
                       child: _sendingCode
                           ? const SizedBox(
                               height: 18,
@@ -246,6 +248,7 @@ class _AuthDialogState extends State<AuthDialog> {
                         child: OutlinedButton(
                           onPressed:
                               _sendingCode ? null : _sendVerificationCode,
+                          style: buildAppOutlinedButtonStyle(colors),
                           child: _sendingCode
                               ? const SizedBox(
                                   height: 18,

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.yuque" "\0"
-            VALUE "FileDescription", "yuque_notes" "\0"
+            VALUE "CompanyName", "NoteYourNeed" "\0"
+            VALUE "FileDescription", "NoteYourNeed" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "yuque_notes" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.yuque. All rights reserved." "\0"
-            VALUE "OriginalFilename", "yuque_notes.exe" "\0"
-            VALUE "ProductName", "yuque_notes" "\0"
+            VALUE "InternalName", "NoteYourNeed" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 NoteYourNeed. All rights reserved." "\0"
+            VALUE "OriginalFilename", "NoteYourNeed.exe" "\0"
+            VALUE "ProductName", "NoteYourNeed" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

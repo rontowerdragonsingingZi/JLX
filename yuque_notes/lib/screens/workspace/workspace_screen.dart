@@ -11,6 +11,7 @@ import '../../services/avatar_service.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/community_sync_service.dart';
 import '../../services/session_service.dart';
+import '../../app_branding.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
 import '../../widgets/app_logo.dart';
@@ -489,10 +490,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         children: [
           AppLogo(size: compact ? 36 : 44),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
-              '我的知识库',
-              style: TextStyle(
+              // 应用内全名；手机桌面图标短名见 Android label「NN」。
+              AppBranding.fullName,
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),

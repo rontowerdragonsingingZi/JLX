@@ -30,4 +30,5 @@ if errorlevel 1 (
 echo.
 echo Windows build completed.
 echo Output: %CD%\build\windows\x64\runner\Release
+echo Exe: NoteYourNeed.exe
 pause

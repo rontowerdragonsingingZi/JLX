@@ -104,9 +104,39 @@ extension AppThemeContext on BuildContext {
       Theme.of(this).extension<AppThemeColors>() ?? AppThemeColors.light;
 }
 
+/// Windows / Android 共用的描边按钮样式（浅绿边 + 主题绿字，对齐登录框）。
+ButtonStyle buildAppOutlinedButtonStyle(AppThemeColors colors) {
+  final outlineSoft = colors.border;
+  final outlineAccent = colors.primary.withValues(alpha: 0.45);
+  return OutlinedButton.styleFrom(
+    foregroundColor: colors.primary,
+    backgroundColor: colors.sidebar,
+    disabledForegroundColor: colors.textSecondary.withValues(alpha: 0.5),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    side: BorderSide(color: outlineAccent),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+  ).copyWith(
+    side: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.disabled)) {
+        return BorderSide(color: outlineSoft);
+      }
+      if (states.contains(WidgetState.pressed) ||
+          states.contains(WidgetState.focused) ||
+          states.contains(WidgetState.hovered)) {
+        return BorderSide(color: colors.primary, width: 1.5);
+      }
+      return BorderSide(color: outlineAccent);
+    }),
+  );
+}
+
 ThemeData buildAppTheme({required Brightness brightness}) {
   final colors =
       brightness == Brightness.dark ? AppThemeColors.dark : AppThemeColors.light;
+
+  // 与登录输入框一致：默认浅描边，强调/聚焦用主题绿，避免 M3 默认黑框。
+  final outlineSoft = colors.border;
+  final outlineAccent = colors.primary.withValues(alpha: 0.45);
 
   final colorScheme = ColorScheme(
     brightness: brightness,
@@ -114,17 +144,32 @@ ThemeData buildAppTheme({required Brightness brightness}) {
     onPrimary: Colors.white,
     secondary: const Color(0xFF1677FF),
     onSecondary: Colors.white,
+    secondaryContainer: colors.selected,
+    onSecondaryContainer: colors.primary,
     error: colors.error,
     onError: Colors.white,
     surface: colors.sidebar,
     onSurface: colors.textPrimary,
+    surfaceContainerHighest: colors.hover,
+    outline: outlineSoft,
+    outlineVariant: outlineSoft,
+  );
+
+  final softRounded = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(6),
   );
 
   return ThemeData(
+    // 同一套 Theme：Windows / Android 共用，不用平台自适应密度，避免边框观感不一致。
     useMaterial3: true,
     brightness: brightness,
     colorScheme: colorScheme,
+    visualDensity: VisualDensity.standard,
+    materialTapTargetSize: MaterialTapTargetSize.padded,
     scaffoldBackgroundColor: colors.background,
+    canvasColor: colors.sidebar,
+    cardColor: colors.sidebar,
+    dividerColor: outlineSoft,
     extensions: [colors],
     appBarTheme: AppBarTheme(
       backgroundColor: colors.sidebar,
@@ -135,6 +180,16 @@ ThemeData buildAppTheme({required Brightness brightness}) {
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: colors.sidebar,
+      surfaceTintColor: Colors.transparent,
+      shape: softRounded,
+    ),
+    cardTheme: CardThemeData(
+      color: colors.sidebar,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: softRounded.copyWith(
+        side: BorderSide(color: outlineSoft),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -142,17 +197,30 @@ ThemeData buildAppTheme({required Brightness brightness}) {
           ? const Color(0xFF2A2A2A)
           : Colors.white,
       labelStyle: TextStyle(color: colors.textSecondary),
+      hintStyle: TextStyle(color: colors.textSecondary),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: colors.border),
+        borderSide: BorderSide(color: outlineSoft),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: colors.border),
+        borderSide: BorderSide(color: outlineSoft),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: outlineSoft.withValues(alpha: 0.7)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(6),
         borderSide: BorderSide(color: colors.primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: colors.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: colors.error, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
     ),
@@ -162,7 +230,20 @@ ThemeData buildAppTheme({required Brightness brightness}) {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        shape: softRounded,
+      ),
+    ),
+    // 「新建文件夹」「发送验证码」等：Windows / Android 同一套描边样式。
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: buildAppOutlinedButtonStyle(colors),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        foregroundColor: colors.primary,
+        backgroundColor: colors.selected,
+        disabledForegroundColor: colors.textSecondary.withValues(alpha: 0.5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        shape: softRounded,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -171,8 +252,9 @@ ThemeData buildAppTheme({required Brightness brightness}) {
       ),
     ),
     dividerTheme: DividerThemeData(
-      color: colors.border,
+      color: outlineSoft,
       thickness: 1,
+      space: 1,
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
@@ -182,8 +264,29 @@ ThemeData buildAppTheme({required Brightness brightness}) {
     chipTheme: ChipThemeData(
       backgroundColor: colors.selected,
       labelStyle: TextStyle(color: colors.primary, fontSize: 12),
-      side: BorderSide(color: colors.primary.withValues(alpha: 0.3)),
+      side: BorderSide(color: outlineAccent),
       padding: const EdgeInsets.symmetric(horizontal: 4),
+      shape: softRounded,
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: colors.sidebar,
+      surfaceTintColor: Colors.transparent,
+      shape: softRounded,
+      textStyle: TextStyle(color: colors.textPrimary, fontSize: 14),
+    ),
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(colors.sidebar),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        shape: WidgetStatePropertyAll(softRounded),
+        side: WidgetStatePropertyAll(BorderSide(color: outlineSoft)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      backgroundColor: colors.textPrimary,
+      contentTextStyle: TextStyle(color: colors.sidebar),
+      behavior: SnackBarBehavior.floating,
+      shape: softRounded,
     ),
   );
 }

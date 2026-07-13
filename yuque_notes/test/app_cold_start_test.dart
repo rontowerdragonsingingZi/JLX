@@ -26,12 +26,12 @@ void main() {
 
       for (var attempt = 0; attempt < 40; attempt++) {
         await tester.pump(const Duration(milliseconds: 50));
-        if (find.text('我的知识库').evaluate().isNotEmpty) {
+        if (find.text('NoteYourNeed').evaluate().isNotEmpty) {
           break;
         }
       }
 
-      expect(find.text('我的知识库'), findsOneWidget);
+      expect(find.text('NoteYourNeed'), findsOneWidget);
       expect(find.byKey(const Key('guest_login_prompt')), findsOneWidget);
       expect(find.text('请登录'), findsOneWidget);
     });
@@ -60,7 +60,7 @@ void main() {
         }
       }
 
-      expect(find.text('我的知识库'), findsOneWidget);
+      expect(find.text('NoteYourNeed'), findsOneWidget);
       expect(find.text('frank'), findsOneWidget);
       expect(find.byKey(const Key('guest_login_prompt')), findsNothing);
 

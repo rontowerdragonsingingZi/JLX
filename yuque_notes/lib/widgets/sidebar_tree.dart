@@ -61,6 +61,7 @@ class _SidebarTreeState extends State<SidebarTree> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => widget.onCreateFolder(null),
+                  style: buildAppOutlinedButtonStyle(colors),
                   icon: const Icon(Icons.create_new_folder_outlined, size: 18),
                   label: const Text('新建文件夹'),
                 ),

@@ -231,6 +231,14 @@ class MobileFormatPanel extends StatelessWidget {
                               ),
                             ActionChip(
                               label: const Text('默认色'),
+                              side: BorderSide(
+                                color: colors.primary.withValues(alpha: 0.45),
+                              ),
+                              backgroundColor: colors.selected,
+                              labelStyle: TextStyle(
+                                color: colors.primary,
+                                fontSize: 12,
+                              ),
                               onPressed: () => _applyOrClear(
                                 const ColorAttribute(null),
                                 clear: true,
