@@ -42,7 +42,7 @@ void main() {
         DocumentEditorPanel(
           document: document,
           canSyncToCommunity: true,
-          onSyncToCommunity: () async {},
+          onSyncToCommunity: () async => true,
           onSave: (_) async {},
         ),
       ),
@@ -50,12 +50,13 @@ void main() {
     await tester.pump();
 
     expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
-    expect(find.text('同步到社区'), findsOneWidget);
+    expect(find.text('上传云端'), findsOneWidget);
     expect(find.byKey(const Key('synced_to_community_badge')), findsOneWidget);
-    expect(find.text('已同步'), findsOneWidget);
+    expect(find.text('已上传'), findsOneWidget);
   });
 
-  testWidgets('hides sync control for guest documents', (tester) async {
+  testWidgets('shows upload control when callback provided even without badge',
+      (tester) async {
     final document = models.Document(
       id: 1,
       userId: 2,
@@ -70,12 +71,15 @@ void main() {
       _wrapEditor(
         DocumentEditorPanel(
           document: document,
+          canSyncToCommunity: true,
+          onSyncToCommunity: () async => false,
           onSave: (_) async {},
         ),
       ),
     );
     await tester.pump();
 
-    expect(find.byKey(const Key('sync_to_community_button')), findsNothing);
+    expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
+    expect(find.text('上传云端'), findsOneWidget);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/models/document.dart';
 import '../data/models/folder.dart';
 import '../theme/app_theme.dart';
+import '../utils/responsive_layout.dart';
 import 'name_dialog.dart';
 
 typedef FolderAction = Future<void> Function(int? parentId);
@@ -49,11 +50,12 @@ class _SidebarTreeState extends State<SidebarTree> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final compact = isCompactLayout(context);
     final roots = _childrenOf(null);
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: EdgeInsets.fromLTRB(12, compact ? 8 : 12, 12, 8),
           child: Row(
             children: [
               Expanded(
@@ -69,26 +71,40 @@ class _SidebarTreeState extends State<SidebarTree> {
         Expanded(
           child: roots.isEmpty
               ? Center(
-                  child: Text(
-                    '暂无内容，请创建文件夹',
-                    style: TextStyle(color: colors.textSecondary),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      '暂无内容，请创建文件夹',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: colors.textSecondary),
+                    ),
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  children: roots.map((folder) => _buildFolderNode(folder, colors)).toList(),
+                  padding: EdgeInsets.fromLTRB(8, 0, 8, compact ? 16 : 8),
+                  children: roots
+                      .map((folder) => _buildFolderNode(folder, colors, compact))
+                      .toList(),
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildFolderNode(Folder folder, AppThemeColors colors) {
+  Widget _buildFolderNode(
+    Folder folder,
+    AppThemeColors colors,
+    bool compact,
+  ) {
     final children = _childrenOf(folder.id);
     final documents = widget.documentsByFolder[folder.id] ?? [];
     final isExpanded = _expandedFolderIds.contains(folder.id);
     final isSelected = widget.selectedFolderId == folder.id &&
         widget.selectedDocumentId == null;
+    final rowPadding = EdgeInsets.symmetric(
+      horizontal: 4,
+      vertical: compact ? 8 : 2,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +125,7 @@ class _SidebarTreeState extends State<SidebarTree> {
               widget.onSelect(folderId: folder.id);
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              padding: rowPadding,
               child: Row(
                 children: [
                   Icon(
@@ -154,13 +170,13 @@ class _SidebarTreeState extends State<SidebarTree> {
           ...children.map(
             (child) => Padding(
               padding: const EdgeInsets.only(left: 16),
-              child: _buildFolderNode(child, colors),
+              child: _buildFolderNode(child, colors, compact),
             ),
           ),
           ...documents.map(
             (doc) => Padding(
               padding: const EdgeInsets.only(left: 24),
-              child: _buildDocumentTile(doc, colors),
+              child: _buildDocumentTile(doc, colors, compact),
             ),
           ),
         ],
@@ -168,7 +184,11 @@ class _SidebarTreeState extends State<SidebarTree> {
     );
   }
 
-  Widget _buildDocumentTile(Document document, AppThemeColors colors) {
+  Widget _buildDocumentTile(
+    Document document,
+    AppThemeColors colors,
+    bool compact,
+  ) {
     final isSelected = widget.selectedDocumentId == document.id;
     return Material(
       color: isSelected ? colors.selected : Colors.transparent,
@@ -180,7 +200,10 @@ class _SidebarTreeState extends State<SidebarTree> {
           documentId: document.id,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          padding: EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: compact ? 10 : 4,
+          ),
           child: Row(
             children: [
               Icon(Icons.description_outlined, size: 18, color: colors.textSecondary),

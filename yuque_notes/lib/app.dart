@@ -24,7 +24,7 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
   final _sessionService = SessionService();
   final _localUserService = LocalUserService();
   final _themeService = ThemeService();
-  Widget _home = const _SplashScreen();
+  bool _ready = false;
   User? _localUser;
   User? _cloudUser;
   ThemeMode _themeMode = ThemeMode.light;
@@ -48,19 +48,8 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
       _themeMode = themeMode;
       _localUser = localUser;
       _cloudUser = cloudSession?.toDisplayUser();
-      _home = _buildWorkspace();
+      _ready = true;
     });
-  }
-
-  WorkspaceScreen _buildWorkspace() {
-    return WorkspaceScreen(
-      localUser: _localUser!,
-      cloudUser: _cloudUser,
-      onCloudAuthChanged: _onCloudAuthChanged,
-      cloudAuthApi: widget.cloudAuthApi,
-      themeMode: _themeMode,
-      onToggleTheme: _toggleTheme,
-    );
   }
 
   Future<void> _toggleTheme() async {
@@ -69,10 +58,7 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
     if (!mounted) {
       return;
     }
-    setState(() {
-      _themeMode = next;
-      _home = _buildWorkspace();
-    });
+    setState(() => _themeMode = next);
   }
 
   Future<void> _onCloudAuthChanged(User? cloudUser) async {
@@ -85,10 +71,10 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
     if (!mounted) {
       return;
     }
+    // 仅更新用户，不重建 WorkspaceScreen，保留当前打开的文档与编辑状态。
     setState(() {
       _cloudUser = cloudUser;
       _localUser = localUser;
-      _home = _buildWorkspace();
     });
   }
 
@@ -110,7 +96,16 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
         Locale('zh', 'CN'),
         Locale('en', 'US'),
       ],
-      home: _home,
+      home: !_ready || _localUser == null
+          ? const _SplashScreen()
+          : WorkspaceScreen(
+              localUser: _localUser!,
+              cloudUser: _cloudUser,
+              onCloudAuthChanged: _onCloudAuthChanged,
+              cloudAuthApi: widget.cloudAuthApi,
+              themeMode: _themeMode,
+              onToggleTheme: _toggleTheme,
+            ),
     );
   }
 }

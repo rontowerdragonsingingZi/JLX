@@ -143,16 +143,27 @@ class _AuthDialogState extends State<AuthDialog> {
     final isLogin = _mode == _AuthMode.login;
     final colors = context.appColors;
 
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final compact = screenWidth < 720;
+    final horizontalInset = compact ? 16.0 : 40.0;
+
     return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: horizontalInset,
+        vertical: compact ? 24 : 40,
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
+        constraints: BoxConstraints(
+          maxWidth: 430,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
+          padding: EdgeInsets.all(compact ? 20 : 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Center(child: AppLogo(size: 88)),
+              Center(child: AppLogo(size: compact ? 64 : 88)),
               const SizedBox(height: 16),
               Text(
                 isLogin ? '登录云端论坛' : '注册云端论坛',
@@ -194,37 +205,60 @@ class _AuthDialogState extends State<AuthDialog> {
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _verificationCodeController,
-                        decoration:
-                            const InputDecoration(labelText: '邮箱验证码'),
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                      ),
+                if (compact) ...[
+                  TextField(
+                    controller: _verificationCodeController,
+                    decoration: const InputDecoration(labelText: '邮箱验证码'),
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 48,
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _sendingCode ? null : _sendVerificationCode,
+                      child: _sendingCode
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('发送验证码'),
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      height: 48,
-                      child: OutlinedButton(
-                        onPressed:
-                            _sendingCode ? null : _sendVerificationCode,
-                        child: _sendingCode
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('发送验证码'),
+                  ),
+                ] else
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _verificationCodeController,
+                          decoration:
+                              const InputDecoration(labelText: '邮箱验证码'),
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _submit(),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed:
+                              _sendingCode ? null : _sendVerificationCode,
+                          child: _sendingCode
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('发送验证码'),
+                        ),
+                      ),
+                    ],
+                  ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 12),

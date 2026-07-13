@@ -12,6 +12,7 @@ import '../../services/cloud_auth_api.dart';
 import '../../services/community_sync_service.dart';
 import '../../services/session_service.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/responsive_layout.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/document_editor_panel.dart';
 import '../../widgets/name_dialog.dart';
@@ -68,9 +69,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   int get _localUserId => widget.localUser.id;
 
   bool get _isCloudLoggedIn => widget.cloudUser != null;
-
-  bool get _canSyncDocument =>
-      _isCloudLoggedIn && !AuthRepository.isLocalGuest(widget.localUser);
 
   @override
   void initState() {
@@ -321,35 +319,38 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     );
   }
 
-  Future<void> _syncDocumentToCommunity() async {
+  Future<bool> _syncDocumentToCommunity() async {
     if (_selectedDocument == null) {
-      return;
+      return false;
     }
 
+    // 未登录：先弹登录；登录成功后继续上传。
     if (!_isCloudLoggedIn) {
-      if (mounted) {
-        _showError('请先登录社区账号');
+      await _showAuthDialog();
+      if (!mounted) {
+        return false;
       }
-      return;
-    }
-
-    if (!_canSyncDocument) {
-      if (mounted) {
-        _showError('当前为本地游客笔记，请登录社区账号后创建文档再同步');
-      }
-      return;
     }
 
     var session = await _sessionService.getCloudSession();
     if (session == null) {
       if (mounted) {
-        _showError('请先登录社区账号');
+        _showError('请先登录后再上传云端');
       }
-      return;
+      return false;
+    }
+
+    // 登录后 localUser 可能已切换；游客文档仍不可上传。
+    if (AuthRepository.isLocalGuest(widget.localUser)) {
+      if (mounted) {
+        _showError('当前为本地游客笔记，请登录社区账号后新建文档再上传');
+      }
+      return false;
     }
 
     try {
       await _syncDocumentWithSession(session.accessToken);
+      return true;
     } on CommunitySyncException catch (error) {
       if (error.statusCode == 401 && widget._cloudAuthApi != null) {
         final refreshed = await _sessionService.refreshCloudSession(
@@ -358,18 +359,18 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         if (refreshed != null && refreshed.accessToken != session.accessToken) {
           try {
             await _syncDocumentWithSession(refreshed.accessToken);
-            return;
+            return true;
           } on CommunitySyncException catch (retryError) {
             _showError(retryError.message);
             rethrow;
           }
         }
         if (!mounted) {
-          return;
+          return false;
         }
         await widget.onCloudAuthChanged(null);
         _showError('登录已过期，请重新登录');
-        return;
+        return false;
       }
       _showError(error.message);
       rethrow;
@@ -460,112 +461,188 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     );
   }
 
+  Future<void> _onTreeSelect({int? folderId, int? documentId}) async {
+    setState(() => _selectedFolderId = folderId);
+    if (documentId != null) {
+      final doc = await _documentRepository.getDocument(
+        userId: _localUserId,
+        documentId: documentId,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _selectedDocument = doc);
+    } else {
+      setState(() => _selectedDocument = null);
+    }
+  }
+
+  void _closeDocument() {
+    setState(() => _selectedDocument = null);
+  }
+
+  Widget _buildLibraryHeader({required bool compact}) {
+    final isDark = widget.themeMode == ThemeMode.dark;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 8, 8),
+      child: Row(
+        children: [
+          AppLogo(size: compact ? 36 : 44),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              '我的知识库',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('theme_toggle_button'),
+            icon: Icon(
+              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+              size: 20,
+            ),
+            tooltip: isDark ? '日间模式' : '黑夜模式',
+            onPressed: widget.onToggleTheme,
+          ),
+          if (_isCloudLoggedIn)
+            IconButton(
+              icon: const Icon(Icons.logout, size: 20),
+              tooltip: '退出登录',
+              onPressed: _logout,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLibraryPane({
+    required bool compact,
+    required bool showRightBorder,
+  }) {
+    final colors = context.appColors;
+    return Container(
+      decoration: BoxDecoration(
+        color: colors.sidebar,
+        border: showRightBorder
+            ? Border(right: BorderSide(color: colors.border))
+            : null,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildLibraryHeader(compact: compact),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _buildProfileSection(),
+            ),
+            Divider(height: compact ? 16 : 24),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SidebarTree(
+                      folders: _folders,
+                      documentsByFolder: _documentsByFolder,
+                      selectedFolderId: _selectedFolderId,
+                      selectedDocumentId: _selectedDocument?.id,
+                      onSelect: _onTreeSelect,
+                      onCreateFolder: _createFolder,
+                      onCreateDocument: _createDocument,
+                      onRename: _rename,
+                      onDelete: _delete,
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveSelectedDocument(String markdown) async {
+    await _documentRepository.updateDocumentContent(
+      userId: _localUserId,
+      documentId: _selectedDocument!.id,
+      content: markdown,
+    );
+    await _refreshDocument(_selectedDocument!.id);
+  }
+
+  Widget _buildEditorPane({
+    VoidCallback? onBack,
+    bool showTitleBar = true,
+  }) {
+    if (_selectedDocument == null) {
+      return const _WelcomePanel();
+    }
+    return DocumentEditorPanel(
+      key: ValueKey(_selectedDocument!.id),
+      document: _selectedDocument!,
+      // 始终展示「上传云端」；未登录时由 onSyncToCommunity 内拉起登录。
+      canSyncToCommunity: true,
+      isSyncedToCommunity: _selectedDocument!.syncedToCommunity,
+      onSyncToCommunity: _syncDocumentToCommunity,
+      onBack: onBack,
+      showTitleBar: showTitleBar,
+      onSave: _saveSelectedDocument,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final compact = isCompactLayout(context);
     final colors = context.appColors;
-    final isDark = widget.themeMode == ThemeMode.dark;
+
+    if (compact) {
+      final showingEditor = _selectedDocument != null;
+      return PopScope(
+        canPop: !showingEditor,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && showingEditor) {
+            _closeDocument();
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          appBar: showingEditor
+              ? AppBar(
+                  leading: IconButton(
+                    key: const Key('document_back_button'),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: '返回目录',
+                    onPressed: _closeDocument,
+                  ),
+                  title: Text(
+                    _selectedDocument!.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  backgroundColor: colors.sidebar,
+                  foregroundColor: colors.textPrimary,
+                )
+              : null,
+          body: showingEditor
+              ? _buildEditorPane(
+                  onBack: null,
+                  showTitleBar: false,
+                )
+              : _buildLibraryPane(compact: true, showRightBorder: false),
+        ),
+      );
+    }
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: Row(
         children: [
           SizedBox(
             width: 280,
-            child: Container(
-              decoration: BoxDecoration(
-                color: colors.sidebar,
-                border: Border(right: BorderSide(color: colors.border)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    child: Row(
-                      children: [
-                        const AppLogo(size: 44),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            '我的知识库',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          key: const Key('theme_toggle_button'),
-                          icon: Icon(
-                            isDark
-                                ? Icons.light_mode_outlined
-                                : Icons.dark_mode_outlined,
-                            size: 20,
-                          ),
-                          tooltip: isDark ? '日间模式' : '黑夜模式',
-                          onPressed: widget.onToggleTheme,
-                        ),
-                        if (_isCloudLoggedIn)
-                          IconButton(
-                            icon: const Icon(Icons.logout, size: 20),
-                            tooltip: '退出登录',
-                            onPressed: _logout,
-                          ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildProfileSection(),
-                  ),
-                  const Divider(height: 24),
-                  Expanded(
-                    child: _loading
-                        ? const Center(child: CircularProgressIndicator())
-                        : SidebarTree(
-                            folders: _folders,
-                            documentsByFolder: _documentsByFolder,
-                            selectedFolderId: _selectedFolderId,
-                            selectedDocumentId: _selectedDocument?.id,
-                            onSelect: ({folderId, documentId}) async {
-                              setState(() => _selectedFolderId = folderId);
-                              if (documentId != null) {
-                                final doc = await _documentRepository.getDocument(
-                                  userId: _localUserId,
-                                  documentId: documentId,
-                                );
-                                setState(() => _selectedDocument = doc);
-                              } else {
-                                setState(() => _selectedDocument = null);
-                              }
-                            },
-                            onCreateFolder: _createFolder,
-                            onCreateDocument: _createDocument,
-                            onRename: _rename,
-                            onDelete: _delete,
-                          ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildLibraryPane(compact: false, showRightBorder: true),
           ),
-          Expanded(
-            child: _selectedDocument != null
-                ? DocumentEditorPanel(
-                    key: ValueKey(_selectedDocument!.id),
-                    document: _selectedDocument!,
-                    canSyncToCommunity: _canSyncDocument,
-                    onSyncToCommunity: _syncDocumentToCommunity,
-                    onSave: (markdown) async {
-                      await _documentRepository.updateDocumentContent(
-                        userId: _localUserId,
-                        documentId: _selectedDocument!.id,
-                        content: markdown,
-                      );
-                      await _refreshDocument(_selectedDocument!.id);
-                    },
-                  )
-                : const _WelcomePanel(),
-          ),
+          Expanded(child: _buildEditorPane()),
         ],
       ),
     );
@@ -578,17 +655,22 @@ class _WelcomePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final compact = isCompactLayout(context);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const AppLogo(size: 140),
-          const SizedBox(height: 16),
-          Text(
-            '选择或创建一个文档开始记录',
-            style: TextStyle(fontSize: 16, color: colors.textSecondary),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppLogo(size: compact ? 96 : 140),
+            const SizedBox(height: 16),
+            Text(
+              '选择或创建一个文档开始记录',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: colors.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }

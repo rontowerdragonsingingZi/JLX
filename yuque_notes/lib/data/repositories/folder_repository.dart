@@ -64,6 +64,30 @@ class FolderRepository {
     return Folder.fromMap(rows.first);
   }
 
+  Future<List<Folder>> getFolderChain({
+    required int userId,
+    required int folderId,
+  }) async {
+    final chain = <Folder>[];
+    var current = await getFolder(userId: userId, folderId: folderId);
+    final visitedIds = <int>{};
+
+    while (current != null) {
+      if (!visitedIds.add(current.id)) {
+        throw RepositoryException('Folder tree contains a cycle');
+      }
+      chain.insert(0, current);
+
+      final parentId = current.parentId;
+      if (parentId == null) {
+        break;
+      }
+      current = await getFolder(userId: userId, folderId: parentId);
+    }
+
+    return chain;
+  }
+
   Future<List<Folder>> getChildFolders({
     required int userId,
     int? parentId,

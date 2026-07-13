@@ -54,6 +54,13 @@ class CommunitySyncService {
       userId: document.userId,
       folderId: document.folderId,
     );
+    final folderChain = await _folderRepository.getFolderChain(
+      userId: document.userId,
+      folderId: document.folderId,
+    );
+    final folderPath = folderChain.isEmpty
+        ? null
+        : folderChain.map((folder) => folder.name).join(' / ');
 
     try {
       await _forumClient.postJson(
@@ -65,6 +72,17 @@ class CommunitySyncService {
           'bssDocumentId': document.id,
           'bssFolderId': document.folderId,
           if (folder != null) 'bssFolderName': folder.name,
+          if (folderPath != null) 'bssFolderPath': folderPath,
+          if (folderChain.isNotEmpty)
+            'bssFolderChain': [
+              for (var index = 0; index < folderChain.length; index += 1)
+                {
+                  'id': folderChain[index].id,
+                  'parentId': folderChain[index].parentId,
+                  'name': folderChain[index].name,
+                  'depth': index,
+                },
+            ],
           'title': document.title,
           'content': document.content,
           'bssDocumentUpdatedAt': document.updatedAt.toIso8601String(),
