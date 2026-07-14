@@ -36,3 +36,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/app_logo.png
+    - assets/images/contact/qq_qr.png
+    - assets/images/contact/wechat_qr.png
+    - assets/images/contact/tg_qr.png

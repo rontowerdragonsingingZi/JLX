@@ -15,6 +15,7 @@ import '../../app_branding.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
 import '../../widgets/app_logo.dart';
+import '../../widgets/contact_us_dialog.dart';
 import '../../widgets/document_editor_panel.dart';
 import '../../widgets/name_dialog.dart';
 import '../../widgets/sidebar_tree.dart';
@@ -557,6 +558,55 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       onRename: _rename,
                       onDelete: _delete,
                     ),
+            ),
+            // Windows / Android 共用：底部「联系我们」
+            _buildContactUsBar(colors),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactUsBar(AppThemeColors colors) {
+    return Material(
+      color: colors.sidebar,
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Divider(height: 1, color: colors.border),
+            InkWell(
+              key: const Key('contact_us_entry'),
+              onTap: () => showContactUsDialog(context),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.support_agent_outlined,
+                      size: 20,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '联系我们',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: colors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 20,
+                      color: colors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
