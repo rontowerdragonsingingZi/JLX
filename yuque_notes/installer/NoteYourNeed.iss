@@ -3,7 +3,7 @@
 ; 再编译本脚本生成 Setup.exe
 
 #define MyAppName "NoteYourNeed"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "NoteYourNeed"
 #define MyAppExeName "NoteYourNeed.exe"
 #define MyAppSource "..\build\windows\x64\runner\Release"

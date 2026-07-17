@@ -7,6 +7,30 @@ class FolderRepository {
 
   final DatabaseHelper _databaseHelper;
 
+  /// 同级（同一 parentId）下是否已存在同名文件夹（不区分大小写）。
+  Future<bool> hasSiblingFolderName({
+    required int userId,
+    int? parentId,
+    required String name,
+    int? excludeFolderId,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+    final siblings = await getChildFolders(userId: userId, parentId: parentId);
+    final lower = trimmed.toLowerCase();
+    for (final sibling in siblings) {
+      if (excludeFolderId != null && sibling.id == excludeFolderId) {
+        continue;
+      }
+      if (sibling.name.trim().toLowerCase() == lower) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<Folder> createFolder({
     required int userId,
     int? parentId,
@@ -23,6 +47,14 @@ class FolderRepository {
       if (parent == null) {
         throw RepositoryException('父文件夹不存在');
       }
+    }
+
+    if (await hasSiblingFolderName(
+      userId: userId,
+      parentId: parentId,
+      name: trimmed,
+    )) {
+      throw RepositoryException('该级文件夹名称不能重复，请创建一个次级文件夹');
     }
 
     final now = DateTime.now();
@@ -130,6 +162,15 @@ class FolderRepository {
       throw RepositoryException('文件夹不存在');
     }
 
+    if (await hasSiblingFolderName(
+      userId: userId,
+      parentId: folder.parentId,
+      name: trimmed,
+      excludeFolderId: folderId,
+    )) {
+      throw RepositoryException('该级文件夹名称不能重复，请创建一个次级文件夹');
+    }
+
     final now = DateTime.now();
     final db = await _databaseHelper.database;
     await db.update(
@@ -143,6 +184,23 @@ class FolderRepository {
     );
 
     return folder.copyWith(name: trimmed, updatedAt: now);
+  }
+
+  /// 按名称查找同级文件夹；用于导入时合并同名路径。
+  Future<Folder?> findChildFolderByName({
+    required int userId,
+    int? parentId,
+    required String name,
+  }) async {
+    final trimmed = name.trim();
+    final siblings = await getChildFolders(userId: userId, parentId: parentId);
+    final lower = trimmed.toLowerCase();
+    for (final sibling in siblings) {
+      if (sibling.name.trim().toLowerCase() == lower) {
+        return sibling;
+      }
+    }
+    return null;
   }
 
   Future<void> deleteFolder({

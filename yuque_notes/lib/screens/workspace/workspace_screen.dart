@@ -10,6 +10,7 @@ import '../../data/repositories/folder_repository.dart';
 import '../../services/avatar_service.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/community_sync_service.dart';
+import '../../services/notebook_transfer_service.dart';
 import '../../services/session_service.dart';
 import '../../app_branding.dart';
 import '../../theme/app_theme.dart';
@@ -60,6 +61,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   late final CommunitySyncService _communitySyncService =
       widget._communitySyncService ?? CommunitySyncService();
   final _sessionService = SessionService();
+  final _notebookTransferService = NotebookTransferService();
+  bool _transferBusy = false;
 
   List<Folder> _folders = [];
   Map<int, List<Document>> _documentsByFolder = {};
@@ -254,9 +257,95 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   void _showError(String message) {
+    // 文件夹重名等业务错误：弹窗更明确
+    if (message.contains('不能重复') || message.contains('不能为空')) {
+      _showErrorDialog('操作失败', message);
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _showErrorDialog(String title, String message) async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: Text(message)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportNotebook() async {
+    if (_transferBusy) {
+      return;
+    }
+    setState(() => _transferBusy = true);
+    try {
+      final path = await _notebookTransferService.exportNotebook(
+        userId: _localUserId,
+      );
+      if (!mounted || path == null) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导出：$path')),
+      );
+    } on NotebookTransferException catch (e) {
+      await _showErrorDialog('导出失败', e.message);
+    } catch (e) {
+      await _showErrorDialog('导出失败', e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _transferBusy = false);
+      }
+    }
+  }
+
+  Future<void> _importNotebook() async {
+    if (_transferBusy) {
+      return;
+    }
+    setState(() => _transferBusy = true);
+    try {
+      final result = await _notebookTransferService.importNotebook(
+        userId: _localUserId,
+      );
+      if (!mounted || result == null) {
+        return;
+      }
+      await _loadTree();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '导入完成：新建文件夹 ${result.foldersImported} 个，文档 ${result.documentsImported} 篇',
+          ),
+        ),
+      );
+    } on NotebookTransferException catch (e) {
+      await _showErrorDialog('导入失败', e.message);
+    } on RepositoryException catch (e) {
+      await _showErrorDialog('导入失败', e.message);
+    } catch (e) {
+      await _showErrorDialog('导入失败', e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _transferBusy = false);
+      }
+    }
   }
 
   Future<void> _showAuthDialog() async {
@@ -576,6 +665,39 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Divider(height: 1, color: colors.border),
+            // 导入 / 导出：整库结构（.nnb JSON），Windows / Android 均可用
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const Key('export_notebook_button'),
+                      onPressed: _transferBusy ? null : _exportNotebook,
+                      style: buildAppOutlinedButtonStyle(colors),
+                      icon: _transferBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.file_upload_outlined, size: 18),
+                      label: const Text('导出'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      key: const Key('import_notebook_button'),
+                      onPressed: _transferBusy ? null : _importNotebook,
+                      style: buildAppOutlinedButtonStyle(colors),
+                      icon: const Icon(Icons.file_download_outlined, size: 18),
+                      label: const Text('导入'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             InkWell(
               key: const Key('contact_us_entry'),
               onTap: () => showContactUsDialog(context),
