@@ -4,10 +4,12 @@ import 'package:flutter_quill/flutter_quill.dart';
 import '../data/models/document.dart' as models;
 import '../editor/editor_persistence.dart';
 import '../editor/image_storage.dart';
+import '../editor/snippet_block.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive_layout.dart';
 import 'mobile_format_panel.dart';
 import 'quill_image_embed.dart';
+import 'quill_snippet_embed.dart';
 
 class DocumentEditorPanel extends StatefulWidget {
   const DocumentEditorPanel({
@@ -117,6 +119,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      FocusManager.instance.primaryFocus?.unfocus();
       final markdown = deltaToMarkdown(
         _controller.document,
         imageWidths: _imageWidths,
@@ -131,6 +134,64 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
       if (mounted) {
         setState(() => _saving = false);
       }
+    }
+  }
+
+  Future<void> _insertSnippet() async {
+    // 插入带稳定 id 的空组件（独占一行），并立刻打开浮层编辑（可输入、有光标）
+    final data = SnippetBlockData(
+      id: SnippetBlockData.newId(),
+      title: '',
+      content: '',
+    );
+    var index = _controller.selection.baseOffset;
+    if (index < 0) {
+      index = 0;
+    }
+    _controller.skipRequestKeyboard = false;
+
+    final plain = _controller.document.toPlainText();
+    if (index > 0 && index <= plain.length) {
+      final prev = plain.substring(index - 1, index);
+      if (prev != '\n') {
+        _controller.replaceText(index, 0, '\n', null);
+        index += 1;
+      }
+    }
+
+    _controller.replaceText(
+      index,
+      0,
+      data.toEmbed(),
+      TextSelection.collapsed(offset: index + 1),
+    );
+    _controller.replaceText(
+      index + 1,
+      0,
+      '\n',
+      TextSelection.collapsed(offset: index + 2),
+    );
+
+    if (!mounted) {
+      return;
+    }
+    // 等一帧让 embed 挂上树，再以当前 context 打开浮层
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!mounted) {
+      return;
+    }
+    _focusNode.unfocus();
+    final edited = await showSnippetOverlayEditor(
+      context: context,
+      anchorContext: context,
+      initial: data,
+    );
+    if (edited != null) {
+      replaceSnippetById(
+        controller: _controller,
+        id: data.id,
+        next: edited,
+      );
     }
   }
 
@@ -323,6 +384,11 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
             showIndent: true,
             customButtons: [
               QuillToolbarCustomButtonOptions(
+                icon: const Icon(Icons.widgets_outlined, size: 20),
+                tooltip: '插入可复制块',
+                onPressed: _insertSnippet,
+              ),
+              QuillToolbarCustomButtonOptions(
                 icon: const Icon(Icons.image_outlined, size: 20),
                 tooltip: '插入图片',
                 onPressed: _insertImage,
@@ -404,8 +470,9 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
             scrollable: true,
             showCursor: true,
             enableInteractiveSelection: true,
-            embedBuilders: const [
-              QuillImageEmbedBuilder(),
+            embedBuilders: [
+              const QuillImageEmbedBuilder(),
+              QuillSnippetEmbedBuilder(editorFocusNode: _focusNode),
             ],
             customStyles: DefaultStyles(
               placeHolder: DefaultTextBlockStyle(
@@ -539,6 +606,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                                   setState(() => _formatPanelOpen = false),
                               onInsertImage: _insertImage,
                               onResizeImage: _resizeSelectedImage,
+                              onInsertSnippet: _insertSnippet,
                             )
                           : const SizedBox.shrink(),
                     ),

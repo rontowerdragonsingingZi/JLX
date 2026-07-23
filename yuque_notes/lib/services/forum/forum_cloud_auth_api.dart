@@ -43,12 +43,14 @@ class ForumCloudAuthApi implements CloudAuthApi {
         '/api/auth/send-verification-code',
         body: {'email': email.trim()},
       );
+      // 后端始终返回数字类型 retryAfterSeconds
       final retryAfterSeconds = json['retryAfterSeconds'];
-      if (retryAfterSeconds == null) {
-        return null;
-      }
       if (retryAfterSeconds is num) {
         return retryAfterSeconds.toInt();
+      }
+      // 兼容旧响应
+      if (retryAfterSeconds == null) {
+        return null;
       }
       throw CloudAuthException('Unexpected verification response');
     } on ForumApiException catch (error) {
@@ -75,14 +77,18 @@ class ForumCloudAuthApi implements CloudAuthApi {
     required String? avatar,
   }) async {
     try {
+      // 请求可发 Data URI；响应必须是 R2 公网 URL 或 null，客户端禁止再用本地 Base64 顶替
       final json = await _client.patchJson(
         '/api/users/me/avatar',
         accessToken: accessToken,
         body: {'avatar': avatar},
       );
       final updatedAvatar = json['avatar'];
-      if (updatedAvatar == null || updatedAvatar is String) {
-        return updatedAvatar as String?;
+      if (updatedAvatar == null) {
+        return null;
+      }
+      if (updatedAvatar is String) {
+        return updatedAvatar;
       }
       throw CloudAuthException('Unexpected avatar response');
     } on ForumApiException catch (error) {

@@ -11,12 +11,14 @@ class MobileFormatPanel extends StatelessWidget {
     required this.onClose,
     required this.onInsertImage,
     required this.onResizeImage,
+    required this.onInsertSnippet,
   });
 
   final QuillController controller;
   final VoidCallback onClose;
   final VoidCallback onInsertImage;
   final VoidCallback onResizeImage;
+  final VoidCallback onInsertSnippet;
 
   void _toggle(Attribute attribute) {
     final attrs = controller.getSelectionStyle().attributes;
@@ -287,6 +289,13 @@ class MobileFormatPanel extends StatelessWidget {
                         onTap: () => controller.indentSelection(false),
                       ),
                       _SectionTitle(title: '插入', colors: colors),
+                      _FormatTile(
+                        icon: Icons.widgets_outlined,
+                        title: '可复制块',
+                        subtitle: '小标题+内容，可一键复制',
+                        colors: colors,
+                        onTap: onInsertSnippet,
+                      ),
                       _FormatTile(
                         icon: Icons.image_outlined,
                         title: '插入图片',

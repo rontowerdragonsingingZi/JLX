@@ -2,12 +2,15 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:markdown_quill/markdown_quill.dart';
 
+import 'snippet_block.dart';
+
 const int defaultImageWidth = 300;
 
 final _mdToDelta = MarkdownToDelta(
   markdownDocument: md.Document(),
   customElementToEmbeddable: {
     'img': (attrs) => BlockEmbed.image(attrs['src'] ?? ''),
+    'nn-snippet': snippetEmbedFromMarkdownAttrs,
   },
 );
 
@@ -22,6 +25,10 @@ String deltaToMarkdown(
         final src = embed.value.data as String;
         final width = widths[src] ?? defaultImageWidth;
         out.write(buildImageMarkdown(source: src, width: width));
+      },
+      kSnippetEmbedType: (embed, out) {
+        final data = SnippetBlockData.fromEmbedData(embed.value.data);
+        out.write(buildSnippetMarkdown(data));
       },
     },
   );

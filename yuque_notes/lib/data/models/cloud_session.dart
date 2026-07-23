@@ -41,13 +41,15 @@ class CloudSession {
     int? userId,
     String? username,
     String? avatar,
+    bool clearAvatar = false,
   }) {
     return CloudSession(
       accessToken: accessToken ?? this.accessToken,
       refreshToken: refreshToken ?? this.refreshToken,
       userId: userId ?? this.userId,
       username: username ?? this.username,
-      avatar: avatar ?? this.avatar,
+      // clearAvatar 允许显式清空；否则可用 avatar 覆盖
+      avatar: clearAvatar ? null : (avatar ?? this.avatar),
     );
   }
 }

@@ -13,6 +13,7 @@ class UserAvatar extends StatelessWidget {
     this.onTap,
   });
 
+  /// 支持 Data URI 或 https/http R2 URL。
   final String? avatar;
   final double radius;
   final VoidCallback? onTap;
@@ -48,7 +49,20 @@ class UserAvatar extends StatelessWidget {
   }
 
   ImageProvider? _avatarImage(String? source) {
-    if (source == null || source.isEmpty || !isPortableImageSource(source)) {
+    if (source == null || source.isEmpty || !isAvatarImageSource(source)) {
+      return null;
+    }
+
+    // 云端 R2 / 普通 HTTPS 头像
+    final uri = Uri.tryParse(source);
+    if (uri != null &&
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.isNotEmpty) {
+      return NetworkImage(source);
+    }
+
+    // 历史/兼容：data:image/...;base64,...
+    if (!isPortableImageSource(source)) {
       return null;
     }
     final commaIndex = source.indexOf(',');

@@ -132,6 +132,9 @@ class _AuthDialogState extends State<AuthDialog> {
       Navigator.of(context).pop(result);
     } on CloudAuthException catch (e) {
       setState(() => _error = e.message);
+    } catch (e) {
+      // 网络层等未包装异常，避免界面只显示空白/无提示
+      setState(() => _error = e.toString());
     } finally {
       if (mounted) {
         setState(() => _loading = false);

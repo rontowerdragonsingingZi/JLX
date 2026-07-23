@@ -369,6 +369,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       return;
     }
 
+    final api = widget._cloudAuthApi;
+    if (api == null) {
+      _showError('云端服务未配置');
+      return;
+    }
+
     final result = await _avatarService.pickAvatarDataUri();
     if (!result.isSuccess) {
       if (result.errorMessage != null && mounted) {
@@ -380,34 +386,64 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     var session = await _sessionService.getCloudSession();
     if (session == null) {
       if (mounted) {
-        _showError('Please sign in first');
+        _showError('请先登录');
       }
       return;
     }
 
+    // 上传 Data URI；必须以服务端返回的 R2 URL（或 null）更新本地会话
     try {
-      final updatedAvatar = await widget._cloudAuthApi?.updateAvatar(
-        accessToken: session.accessToken,
-        avatar: result.dataUri,
+      final serverAvatar = await _updateAvatarWithRefresh(
+        api: api,
+        session: session,
+        dataUri: result.dataUri,
       );
-      await _sessionService.updateCloudAvatar(updatedAvatar ?? result.dataUri);
+      await _sessionService.updateCloudAvatar(serverAvatar);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _avatar = serverAvatar);
+      final cloudUser = widget.cloudUser!;
+      await widget.onCloudAuthChanged(
+        User(
+          id: cloudUser.id,
+          username: cloudUser.username,
+          createdAt: cloudUser.createdAt,
+          avatar: serverAvatar,
+        ),
+      );
     } on CloudAuthException catch (error) {
       _showError(error.message);
-      return;
     }
-    if (!mounted) {
-      return;
+  }
+
+  /// 更新头像；401 时尝试 refresh 后重试一次。
+  Future<String?> _updateAvatarWithRefresh({
+    required CloudAuthApi api,
+    required CloudSession session,
+    required String? dataUri,
+  }) async {
+    try {
+      return await api.updateAvatar(
+        accessToken: session.accessToken,
+        avatar: dataUri,
+      );
+    } on CloudAuthException {
+      final refreshed = await _sessionService.refreshCloudSession(api);
+      if (refreshed == null || refreshed.accessToken.isEmpty) {
+        await widget.onCloudAuthChanged(null);
+        throw CloudAuthException('登录已过期，请重新登录');
+      }
+      try {
+        return await api.updateAvatar(
+          accessToken: refreshed.accessToken,
+          avatar: dataUri,
+        );
+      } on CloudAuthException {
+        await widget.onCloudAuthChanged(null);
+        rethrow;
+      }
     }
-    setState(() => _avatar = result.dataUri);
-    final cloudUser = widget.cloudUser!;
-    await widget.onCloudAuthChanged(
-      User(
-        id: cloudUser.id,
-        username: cloudUser.username,
-        createdAt: cloudUser.createdAt,
-        avatar: result.dataUri,
-      ),
-    );
   }
 
   Future<bool> _syncDocumentToCommunity() async {

@@ -45,12 +45,17 @@ class SessionService {
     );
   }
 
+  /// 更新会话头像。必须使用服务端返回值（R2 URL 或 null），不要存本地 Base64。
   Future<void> updateCloudAvatar(String? avatar) async {
     final session = await getCloudSession();
     if (session == null) {
       return;
     }
-    await saveCloudSession(session.copyWith(avatar: avatar));
+    if (avatar == null) {
+      await saveCloudSession(session.copyWith(clearAvatar: true));
+    } else {
+      await saveCloudSession(session.copyWith(avatar: avatar));
+    }
   }
 
   Future<void> clearCloudSession() async {
@@ -88,12 +93,14 @@ class SessionService {
     CloudSession previous,
     CloudAuthResult result,
   ) {
-    return previous.copyWith(
+    // 刷新/登录响应以服务端为准（avatar 可能是 R2 URL 或 null）
+    final next = CloudSession(
       accessToken: result.accessToken,
       refreshToken: result.refreshToken ?? previous.refreshToken,
       userId: result.userId,
       username: result.username,
-      avatar: result.avatar ?? previous.avatar,
+      avatar: result.avatar,
     );
+    return next;
   }
 }
