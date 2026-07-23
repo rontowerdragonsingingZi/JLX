@@ -15,6 +15,7 @@ import '../../services/session_service.dart';
 import '../../app_branding.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
+import '../../widgets/app_feedback_dialog.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/contact_us_dialog.dart';
 import '../../widgets/document_editor_panel.dart';
@@ -514,11 +515,30 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   Future<void> _logout() async {
-    await _sessionService.clearCloudSession();
-    if (!mounted) {
-      return;
+    try {
+      await _sessionService.clearCloudSession();
+      if (!mounted) {
+        return;
+      }
+      await widget.onCloudAuthChanged(null);
+      if (!mounted) {
+        return;
+      }
+      await showSuccessDialog(
+        context,
+        title: '退出登录成功',
+        message: '您已退出云端账号，本地笔记仍保留在本机。',
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      await showErrorDialog(
+        context,
+        title: '退出登录失败',
+        message: e.toString(),
+      );
     }
-    await widget.onCloudAuthChanged(null);
   }
 
   Widget _buildProfileSection() {

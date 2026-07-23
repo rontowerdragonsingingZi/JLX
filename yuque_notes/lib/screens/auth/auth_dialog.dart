@@ -5,6 +5,7 @@ import '../../data/models/cloud_auth_result.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/forum/forum_cloud_auth_api.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/app_feedback_dialog.dart';
 import '../../widgets/app_logo.dart';
 
 enum _AuthMode { login, register }
@@ -111,9 +112,10 @@ class _AuthDialogState extends State<AuthDialog> {
       _info = null;
     });
 
+    final isLogin = _mode == _AuthMode.login;
     try {
       final CloudAuthResult result;
-      if (_mode == _AuthMode.login) {
+      if (isLogin) {
         result = await _cloudAuthApi.login(
           username: _usernameController.text,
           password: _passwordController.text,
@@ -129,14 +131,47 @@ class _AuthDialogState extends State<AuthDialog> {
       if (!mounted) {
         return;
       }
+      setState(() => _loading = false);
+      await showSuccessDialog(
+        context,
+        title: isLogin ? '登录成功' : '注册成功',
+        message: isLogin
+            ? '欢迎回来，${result.username}！'
+            : '账号 ${result.username} 已创建，欢迎使用 ${AppBranding.fullName}。',
+      );
+      if (!mounted) {
+        return;
+      }
       Navigator.of(context).pop(result);
     } on CloudAuthException catch (e) {
-      setState(() => _error = e.message);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
+      await showErrorDialog(
+        context,
+        title: isLogin ? '登录失败' : '注册失败',
+        message: e.message,
+      );
     } catch (e) {
-      // 网络层等未包装异常，避免界面只显示空白/无提示
-      setState(() => _error = e.toString());
+      if (!mounted) {
+        return;
+      }
+      final msg = e.toString();
+      setState(() {
+        _loading = false;
+        _error = msg;
+      });
+      await showErrorDialog(
+        context,
+        title: isLogin ? '登录失败' : '注册失败',
+        message: msg,
+      );
     } finally {
-      if (mounted) {
+      if (mounted && _loading) {
         setState(() => _loading = false);
       }
     }
