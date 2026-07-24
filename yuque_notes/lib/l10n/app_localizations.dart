@@ -121,7 +121,6 @@ class AppLocalizations {
 
   // —— Editor ——
   String get insertImage => _t('插入图片', 'Insert image');
-  String get resizeImage => _t('调整图片大小', 'Resize image');
   String get insertCopyBlock => _t('插入可复制块', 'Insert copy block');
   String get formatTools => _t('格式工具', 'Format tools');
   String get collapseFormat => _t('收起格式', 'Hide format');
@@ -129,10 +128,9 @@ class AppLocalizations {
       _t('点「格式工具」查看全部功能', 'Open Format tools for all options');
   String get startWriting => _t('开始记录...', 'Start writing...');
   String get cannotReadImage => _t('无法读取图片数据', 'Cannot read image data');
-  String get placeCursorOnImage =>
-      _t('请将光标放在要调整的图片上', 'Place the cursor on the image to resize');
-  String get imageWidth => _t('调整图片宽度', 'Image width');
-  String get widthPx => _t('宽度（像素）', 'Width (px)');
+  String get dropImageOnly =>
+      _t('请拖入图片文件（jpg / png / gif / webp / bmp）',
+          'Drop image files only (jpg / png / gif / webp / bmp)');
   String get editCopyBlock => _t('编辑可复制块', 'Edit copy block');
   String get smallTitle => _t('小标题', 'Title');
   String get enterSmallTitle => _t('输入小标题', 'Enter a title');
@@ -193,7 +191,6 @@ class AppLocalizations {
   String get copyBlockHint =>
       _t('小标题+内容，可一键复制', 'Title + body, one-tap copy');
   String get insertImageHint => _t('从相册选择图片', 'Pick an image');
-  String get imageWidthHint => _t('调整选中图片宽度', 'Resize selected image');
 
   // —— Contact ——
   String get contactMethods => _t('联系方式', 'Contact');

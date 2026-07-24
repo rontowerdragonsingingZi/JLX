@@ -11,14 +11,12 @@ class MobileFormatPanel extends StatelessWidget {
     required this.controller,
     required this.onClose,
     required this.onInsertImage,
-    required this.onResizeImage,
     required this.onInsertSnippet,
   });
 
   final QuillController controller;
   final VoidCallback onClose;
   final VoidCallback onInsertImage;
-  final VoidCallback onResizeImage;
   final VoidCallback onInsertSnippet;
 
   void _toggle(Attribute attribute) {
@@ -312,13 +310,6 @@ class MobileFormatPanel extends StatelessWidget {
                         subtitle: l10n.insertImageHint,
                         colors: colors,
                         onTap: onInsertImage,
-                      ),
-                      _FormatTile(
-                        icon: Icons.photo_size_select_large_outlined,
-                        title: l10n.imageWidth,
-                        subtitle: l10n.imageWidthHint,
-                        colors: colors,
-                        onTap: onResizeImage,
                       ),
                     ],
                   );

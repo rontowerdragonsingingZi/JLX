@@ -96,6 +96,23 @@ Map<String, int> parseAllImageWidths(String markdown) {
       result[src] = width;
     }
   }
+  // Also accept tags with attrs in other order: width before src etc.
+  final loose = RegExp(r'<img\s+([^>]+?)\s*/?>', caseSensitive: false);
+  for (final match in loose.allMatches(markdown)) {
+    final attrs = match.group(1)!;
+    final srcMatch = RegExp(r'src\s*=\s*"([^"]*)"', caseSensitive: false)
+        .firstMatch(attrs);
+    final widthMatch =
+        RegExp(r'width\s*=\s*"(\d+)"', caseSensitive: false).firstMatch(attrs);
+    if (srcMatch == null || widthMatch == null) {
+      continue;
+    }
+    final src = srcMatch.group(1)!;
+    final width = int.tryParse(widthMatch.group(1)!);
+    if (width != null) {
+      result[src] = width;
+    }
+  }
   return result;
 }
 
@@ -224,7 +241,7 @@ String updateImageWidthInMarkdown({
 
 String _normalizeImageTags(String markdown) {
   final pattern = RegExp(
-    r'!\[([^\]]*)\]\(([^)]+)\)\{width=(\d+)\}',
+    r'!\[([^\]]*)\]\(([^)]+)\)\{width=(\d+)(?:\s+wrap=[a-z]+)?\}',
   );
   return markdown.replaceAllMapped(pattern, (match) {
     final alt = match.group(1) ?? '';

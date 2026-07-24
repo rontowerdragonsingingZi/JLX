@@ -1,6 +1,8 @@
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:path/path.dart' as p;
 import '../data/models/document.dart' as models;
 import '../editor/editor_persistence.dart';
 import '../editor/image_storage.dart';
@@ -11,6 +13,15 @@ import '../utils/responsive_layout.dart';
 import 'mobile_format_panel.dart';
 import 'quill_image_embed.dart';
 import 'quill_snippet_embed.dart';
+
+const Set<String> _kImageExtensions = {
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'bmp',
+};
 
 class DocumentEditorPanel extends StatefulWidget {
   const DocumentEditorPanel({
@@ -53,6 +64,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
   bool _saving = false;
   bool _syncing = false;
   bool _formatPanelOpen = false;
+  bool _draggingExternalFiles = false;
   int _selectedImageWidth = defaultImageWidth;
   final Map<String, int> _imageWidths = {};
 
@@ -196,6 +208,37 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     }
   }
 
+  bool _isImageFileName(String name) {
+    final ext = p.extension(name).toLowerCase().replaceFirst('.', '');
+    return _kImageExtensions.contains(ext);
+  }
+
+  String? _extensionOf(String name) {
+    final ext = p.extension(name).toLowerCase().replaceFirst('.', '');
+    return ext.isEmpty ? null : ext;
+  }
+
+  /// 与工具栏「插入图片」一致：写入 data URI 嵌入图。
+  void _insertImageFromBytes(List<int> bytes, String? extension) {
+    if (bytes.isEmpty) {
+      return;
+    }
+    final dataUri =
+        encodeImageDataUri(bytes, mimeFromExtension(extension));
+    final index = _controller.selection.baseOffset.clamp(
+      0,
+      _controller.document.length - 1,
+    );
+    _imageWidths[dataUri] = _selectedImageWidth;
+    _controller.replaceText(
+      index,
+      0,
+      BlockEmbed.image(dataUri),
+      null,
+    );
+    _controller.moveCursorToPosition(index + 1);
+  }
+
   Future<void> _insertImage() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
@@ -210,90 +253,63 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     if (bytes == null || bytes.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('无法读取图片数据')),
+          SnackBar(content: Text(context.l10n.cannotReadImage)),
         );
       }
       return;
     }
 
-    final dataUri =
-        encodeImageDataUri(bytes, mimeFromExtension(picked.extension));
-    final index = _controller.selection.baseOffset;
-    _imageWidths[dataUri] = _selectedImageWidth;
-    _controller.replaceText(
-      index,
-      0,
-      BlockEmbed.image(dataUri),
-      null,
-    );
-    _controller.moveCursorToPosition(index + 1);
+    _insertImageFromBytes(bytes, picked.extension);
   }
 
-  Future<void> _resizeSelectedImage() async {
-    final offset = _controller.selection.baseOffset;
-    final src = findImageSrcAtOffset(_controller.document, offset);
-    if (src == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请将光标放在要调整的图片上')),
-        );
+  Future<void> _handleDroppedFiles(List<DropItem> files) async {
+    var inserted = 0;
+    for (final file in files) {
+      final name = file.name.isNotEmpty ? file.name : file.path;
+      if (!_isImageFileName(name) && !_isImageFileName(file.path)) {
+        continue;
       }
+      try {
+        final bytes = await file.readAsBytes();
+        if (bytes.isEmpty) {
+          continue;
+        }
+        if (!mounted) {
+          return;
+        }
+        _insertImageFromBytes(
+          bytes,
+          _extensionOf(name) ?? _extensionOf(file.path),
+        );
+        inserted += 1;
+      } catch (_) {
+        // skip unreadable file
+      }
+    }
+    if (!mounted) {
       return;
     }
+    if (inserted == 0 && files.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.dropImageOnly)),
+      );
+    }
+  }
 
-    final currentWidth = _imageWidths[src] ??
+  int _widthForImage(String src) {
+    return _imageWidths[src] ??
         parseImageWidth(widget.document.content, src) ??
         _selectedImageWidth;
-    final widthText = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        final controller = TextEditingController(text: '$currentWidth');
-        return AlertDialog(
-          title: const Text('调整图片宽度'),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              hintText: '宽度（像素）',
-              suffixText: 'px',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, controller.text),
-              child: const Text('确定'),
-            ),
-          ],
-        );
-      },
-    );
+  }
 
-    final width = int.tryParse(widthText ?? '');
-    if (width == null || width <= 0) {
+  void _onImageWidthChanged(String src, int width) {
+    if (width <= 0) {
       return;
     }
-
-    final result = applyImageWidthAtOffset(
-      document: _controller.document,
-      currentWidths: _imageWidths,
-      offset: offset,
-      newWidth: width,
-    );
-    if (result == null) {
-      return;
-    }
-
     setState(() {
+      _imageWidths[src] = width;
       _selectedImageWidth = width;
-      _imageWidths
-        ..clear()
-        ..addAll(result.imageWidths);
     });
-    _controller.document = markdownToDocument(result.updatedMarkdown);
   }
 
   Widget _buildBusyIcon(bool busy, IconData icon) {
@@ -387,14 +403,6 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                 tooltip: context.l10n.insertImage,
                 onPressed: _insertImage,
               ),
-              QuillToolbarCustomButtonOptions(
-                icon: const Icon(
-                  Icons.photo_size_select_large_outlined,
-                  size: 20,
-                ),
-                tooltip: context.l10n.resizeImage,
-                onPressed: _resizeSelectedImage,
-              ),
             ],
           ),
         ),
@@ -449,49 +457,76 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
 
   Widget _buildEditor(BuildContext context, {required bool compact}) {
     final editorPadding = compact ? 12.0 : 24.0;
+    final colors = context.appColors;
     // 与 Win 端一致使用白底编辑区，保证文字对比度与点击命中区域清晰。
-    // 外层是否 Expanded 由调用方决定（桌面单独 Expanded，手机在 Row 内 Expanded）。
-    return ColoredBox(
-      color: Colors.white,
-      child: Padding(
-        padding: EdgeInsets.all(editorPadding),
-        child: QuillEditor(
-          controller: _controller,
-          focusNode: _focusNode,
-          scrollController: _scrollController,
-          config: QuillEditorConfig(
-            placeholder: context.l10n.startWriting,
-            padding: EdgeInsets.zero,
-            autoFocus: false,
-            expands: false,
-            scrollable: true,
-            showCursor: true,
-            enableInteractiveSelection: true,
-            embedBuilders: [
-              const QuillImageEmbedBuilder(),
-              QuillSnippetEmbedBuilder(editorFocusNode: _focusNode),
-            ],
-            customStyles: DefaultStyles(
-              placeHolder: DefaultTextBlockStyle(
-                TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade500,
+    // DropTarget：支持从资源管理器等外部拖入图片文件。
+    return DropTarget(
+      onDragEntered: (_) {
+        if (!_draggingExternalFiles) {
+          setState(() => _draggingExternalFiles = true);
+        }
+      },
+      onDragExited: (_) {
+        if (_draggingExternalFiles) {
+          setState(() => _draggingExternalFiles = false);
+        }
+      },
+      onDragDone: (detail) async {
+        if (_draggingExternalFiles) {
+          setState(() => _draggingExternalFiles = false);
+        }
+        await _handleDroppedFiles(detail.files);
+      },
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: _draggingExternalFiles
+              ? Border.all(color: colors.primary, width: 2)
+              : null,
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(editorPadding),
+          child: QuillEditor(
+            controller: _controller,
+            focusNode: _focusNode,
+            scrollController: _scrollController,
+            config: QuillEditorConfig(
+              placeholder: context.l10n.startWriting,
+              padding: EdgeInsets.zero,
+              autoFocus: false,
+              expands: false,
+              scrollable: true,
+              showCursor: true,
+              enableInteractiveSelection: true,
+              embedBuilders: [
+                QuillImageEmbedBuilder(
+                  getWidth: _widthForImage,
+                  onWidthChanged: _onImageWidthChanged,
                 ),
-                HorizontalSpacing.zero,
-                VerticalSpacing.zero,
-                VerticalSpacing.zero,
-                null,
-              ),
-              paragraph: DefaultTextBlockStyle(
-                const TextStyle(
-                  fontSize: 16,
-                  height: 1.5,
-                  color: Color(0xFF262626),
+                QuillSnippetEmbedBuilder(editorFocusNode: _focusNode),
+              ],
+              customStyles: DefaultStyles(
+                placeHolder: DefaultTextBlockStyle(
+                  TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade500,
+                  ),
+                  HorizontalSpacing.zero,
+                  VerticalSpacing.zero,
+                  VerticalSpacing.zero,
+                  null,
                 ),
-                HorizontalSpacing.zero,
-                VerticalSpacing.zero,
-                VerticalSpacing.zero,
-                null,
+                paragraph: DefaultTextBlockStyle(
+                  const TextStyle(
+                    fontSize: 16,
+                    height: 1.5,
+                    color: Color(0xFF262626),
+                  ),
+                  HorizontalSpacing.zero,
+                  VerticalSpacing.zero,
+                  VerticalSpacing.zero,
+                  null,
+                ),
               ),
             ),
           ),
@@ -602,7 +637,6 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                               onClose: () =>
                                   setState(() => _formatPanelOpen = false),
                               onInsertImage: _insertImage,
-                              onResizeImage: _resizeSelectedImage,
                               onInsertSnippet: _insertSnippet,
                             )
                           : const SizedBox.shrink(),
