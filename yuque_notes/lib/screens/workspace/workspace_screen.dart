@@ -77,10 +77,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   int? _selectedFolderId;
   bool _loading = true;
   String? _avatar;
+  double _sidebarWidth = kSidebarDefaultWidth;
 
   int get _localUserId => widget.localUser.id;
 
   bool get _isCloudLoggedIn => widget.cloudUser != null;
+
+  double _sidebarWidthMaxFor(BuildContext context) {
+    final half = MediaQuery.sizeOf(context).width * 0.55;
+    return half.clamp(kSidebarMinWidth, kSidebarMaxWidth);
+  }
 
   @override
   void initState() {
@@ -562,41 +568,66 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
   }
 
-  Widget _buildProfileSection() {
+  Widget _buildProfileSection({required bool condensed}) {
     final colors = context.appColors;
     if (!_isCloudLoggedIn) {
-      return InkWell(
+      final guest = InkWell(
         key: const Key('guest_login_prompt'),
         onTap: _showAuthDialog,
         borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: [
-              Icon(
-                Icons.account_circle_outlined,
-                size: 36,
-                color: colors.textSecondary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  context.l10n.pleaseLogin,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: colors.primary,
-                  ),
+          padding: EdgeInsets.symmetric(vertical: condensed ? 6 : 4),
+          child: condensed
+              ? Icon(
+                  Icons.account_circle_outlined,
+                  size: 32,
+                  color: colors.primary,
+                )
+              : Row(
+                  children: [
+                    Icon(
+                      Icons.account_circle_outlined,
+                      size: 36,
+                      color: colors.textSecondary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        context.l10n.pleaseLogin,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: colors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       );
+      if (condensed) {
+        return Tooltip(
+          message: context.l10n.pleaseLogin,
+          child: Center(child: guest),
+        );
+      }
+      return guest;
     }
 
     final cloudUser = widget.cloudUser!;
     final l10n = context.l10n;
+    if (condensed) {
+      return Center(
+        child: Tooltip(
+          message: '${cloudUser.username}\n${l10n.tapAvatarToChange}',
+          child: UserAvatar(
+            avatar: _avatar,
+            radius: 18,
+            onTap: _pickAvatar,
+          ),
+        ),
+      );
+    }
     return Row(
       children: [
         UserAvatar(
@@ -650,10 +681,69 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     setState(() => _selectedDocument = null);
   }
 
-  Widget _buildLibraryHeader({required bool compact}) {
+  Widget _buildLibraryHeader({
+    required bool compact,
+    required bool condensed,
+  }) {
     final isDark = widget.themeMode == ThemeMode.dark;
     final l10n = context.l10n;
     final isEn = widget.locale.languageCode == 'en';
+
+    final languageMenu = PopupMenuButton<String>(
+      key: const Key('language_menu_button'),
+      tooltip: l10n.language,
+      icon: const Icon(Icons.language, size: 20),
+      onSelected: (value) {
+        final next = value == 'en' ? LocaleService.enUS : LocaleService.zhCN;
+        widget.onLocaleChanged?.call(next);
+      },
+      itemBuilder: (context) => [
+        CheckedPopupMenuItem<String>(
+          value: 'zh',
+          checked: !isEn,
+          child: Text(l10n.languageZh),
+        ),
+        CheckedPopupMenuItem<String>(
+          value: 'en',
+          checked: isEn,
+          child: Text(l10n.languageEn),
+        ),
+      ],
+    );
+    final themeButton = IconButton(
+      key: const Key('theme_toggle_button'),
+      icon: Icon(
+        isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+        size: 20,
+      ),
+      tooltip: isDark ? l10n.dayMode : l10n.nightMode,
+      onPressed: widget.onToggleTheme,
+    );
+    final logoutButton = _isCloudLoggedIn
+        ? IconButton(
+            icon: const Icon(Icons.logout, size: 20),
+            tooltip: l10n.logout,
+            onPressed: _logout,
+          )
+        : null;
+
+    if (condensed) {
+      return Padding(
+        padding: EdgeInsets.fromLTRB(4, compact ? 8 : 12, 4, 4),
+        child: Column(
+          children: [
+            Tooltip(
+              message: AppBranding.fullName,
+              child: AppLogo(size: 32),
+            ),
+            languageMenu,
+            themeButton,
+            ?logoutButton,
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 8, 8),
       child: Row(
@@ -667,45 +757,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          PopupMenuButton<String>(
-            key: const Key('language_menu_button'),
-            tooltip: l10n.language,
-            icon: const Icon(Icons.language, size: 20),
-            onSelected: (value) {
-              final next =
-                  value == 'en' ? LocaleService.enUS : LocaleService.zhCN;
-              widget.onLocaleChanged?.call(next);
-            },
-            itemBuilder: (context) => [
-              CheckedPopupMenuItem<String>(
-                value: 'zh',
-                checked: !isEn,
-                child: Text(l10n.languageZh),
-              ),
-              CheckedPopupMenuItem<String>(
-                value: 'en',
-                checked: isEn,
-                child: Text(l10n.languageEn),
-              ),
-            ],
-          ),
-          IconButton(
-            key: const Key('theme_toggle_button'),
-            icon: Icon(
-              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-              size: 20,
-            ),
-            tooltip: isDark ? l10n.dayMode : l10n.nightMode,
-            onPressed: widget.onToggleTheme,
-          ),
-          if (_isCloudLoggedIn)
-            IconButton(
-              icon: const Icon(Icons.logout, size: 20),
-              tooltip: l10n.logout,
-              onPressed: _logout,
-            ),
+          languageMenu,
+          themeButton,
+          ?logoutButton,
         ],
       ),
     );
@@ -714,6 +771,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   Widget _buildLibraryPane({
     required bool compact,
     required bool showRightBorder,
+    bool condensed = false,
   }) {
     final colors = context.appColors;
     return Container(
@@ -728,12 +786,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildLibraryHeader(compact: compact),
+            _buildLibraryHeader(compact: compact, condensed: condensed),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildProfileSection(),
+              padding: EdgeInsets.symmetric(horizontal: condensed ? 6 : 16),
+              child: _buildProfileSection(condensed: condensed),
             ),
-            Divider(height: compact ? 16 : 24),
+            Divider(height: compact ? 16 : (condensed ? 12 : 24)),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -747,17 +805,22 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       onCreateDocument: _createDocument,
                       onRename: _rename,
                       onDelete: _delete,
+                      condensed: condensed,
                     ),
             ),
             // Windows / Android 共用：底部「联系我们」
-            _buildContactUsBar(colors),
+            _buildContactUsBar(colors, condensed: condensed),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContactUsBar(AppThemeColors colors) {
+  Widget _buildContactUsBar(
+    AppThemeColors colors, {
+    bool condensed = false,
+  }) {
+    final l10n = context.l10n;
     return Material(
       color: colors.sidebar,
       child: SafeArea(
@@ -767,71 +830,149 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           children: [
             Divider(height: 1, color: colors.border),
             // 导入 / 导出：整库结构（.nnb JSON），Windows / Android 均可用
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('export_notebook_button'),
-                      onPressed: _transferBusy ? null : _exportNotebook,
-                      style: buildAppOutlinedButtonStyle(colors),
-                      icon: _transferBusy
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.file_upload_outlined, size: 18),
-                      label: Text(context.l10n.export),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      key: const Key('import_notebook_button'),
-                      onPressed: _transferBusy ? null : _importNotebook,
-                      style: buildAppOutlinedButtonStyle(colors),
-                      icon: const Icon(Icons.file_download_outlined, size: 18),
-                      label: Text(context.l10n.import),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            InkWell(
-              key: const Key('contact_us_entry'),
-              onTap: () => showContactUsDialog(context),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
+            if (condensed)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 4, 2),
+                child: Column(
                   children: [
-                    Icon(
-                      Icons.support_agent_outlined,
-                      size: 20,
-                      color: colors.primary,
+                    Tooltip(
+                      message: l10n.export,
+                      child: IconButton(
+                        key: const Key('export_notebook_button'),
+                        onPressed: _transferBusy ? null : _exportNotebook,
+                        icon: _transferBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(
+                                Icons.file_upload_outlined,
+                                size: 20,
+                                color: colors.primary,
+                              ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        context.l10n.contactUs,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: colors.textPrimary,
+                    Tooltip(
+                      message: l10n.import,
+                      child: IconButton(
+                        key: const Key('import_notebook_button'),
+                        onPressed: _transferBusy ? null : _importNotebook,
+                        icon: Icon(
+                          Icons.file_download_outlined,
+                          size: 20,
+                          color: colors.primary,
                         ),
                       ),
                     ),
-                    Icon(
-                      Icons.chevron_right,
-                      size: 20,
-                      color: colors.textSecondary,
+                  ],
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('export_notebook_button'),
+                        onPressed: _transferBusy ? null : _exportNotebook,
+                        style: buildAppOutlinedButtonStyle(colors),
+                        icon: _transferBusy
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.file_upload_outlined, size: 18),
+                        label: Text(l10n.export),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        key: const Key('import_notebook_button'),
+                        onPressed: _transferBusy ? null : _importNotebook,
+                        style: buildAppOutlinedButtonStyle(colors),
+                        icon: const Icon(Icons.file_download_outlined, size: 18),
+                        label: Text(l10n.import),
+                      ),
                     ),
                   ],
                 ),
               ),
+            InkWell(
+              key: const Key('contact_us_entry'),
+              onTap: () => showContactUsDialog(context),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: condensed ? 8 : 16,
+                  vertical: condensed ? 10 : 12,
+                ),
+                child: condensed
+                    ? Center(
+                        child: Tooltip(
+                          message: l10n.contactUs,
+                          child: Icon(
+                            Icons.support_agent_outlined,
+                            size: 22,
+                            color: colors.primary,
+                          ),
+                        ),
+                      )
+                    : Row(
+                        children: [
+                          Icon(
+                            Icons.support_agent_outlined,
+                            size: 20,
+                            color: colors.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              l10n.contactUs,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            size: 20,
+                            color: colors.textSecondary,
+                          ),
+                        ],
+                      ),
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSidebarResizeHandle(AppThemeColors colors) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragUpdate: (details) {
+          final maxWidth = _sidebarWidthMaxFor(context);
+          setState(() {
+            _sidebarWidth = (_sidebarWidth + details.delta.dx)
+                .clamp(kSidebarMinWidth, maxWidth);
+          });
+        },
+        child: SizedBox(
+          width: 6,
+          child: Center(
+            child: Container(
+              width: 1,
+              color: colors.border,
+            ),
+          ),
         ),
       ),
     );
@@ -909,14 +1050,22 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       );
     }
 
+    final sidebarWidth =
+        _sidebarWidth.clamp(kSidebarMinWidth, _sidebarWidthMaxFor(context));
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Row(
         children: [
           SizedBox(
-            width: 280,
-            child: _buildLibraryPane(compact: false, showRightBorder: true),
+            width: sidebarWidth,
+            child: _buildLibraryPane(
+              compact: false,
+              showRightBorder: false,
+              condensed: sidebarWidth < kSidebarCondensedWidth,
+            ),
           ),
+          _buildSidebarResizeHandle(colors),
           Expanded(child: _buildEditorPane()),
         ],
       ),

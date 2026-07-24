@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 const double kCompactWidthBreakpoint = 720;
 const double kCompactShortestSideBreakpoint = 600;
 
+/// Desktop 左侧栏可拖拽宽度。
+const double kSidebarDefaultWidth = 280;
+const double kSidebarMinWidth = 72;
+const double kSidebarMaxWidth = 480;
+/// 低于此宽度时左侧栏改为图标缩略布局。
+const double kSidebarCondensedWidth = 148;
+
 bool isCompactLayout(BuildContext context) {
   final size = MediaQuery.sizeOf(context);
   return size.width < kCompactWidthBreakpoint ||
