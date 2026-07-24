@@ -3,7 +3,7 @@
 ; AppId 固定：已安装用户再次安装同一安装包时会覆盖升级（保留 AppData 笔记数据）
 
 #define MyAppName "NoteYourNeed"
-#define MyAppVersion "1.0.4"
+#define MyAppVersion "1.0.7"
 #define MyAppPublisher "NoteYourNeed"
 #define MyAppExeName "NoteYourNeed.exe"
 #define MyAppSource "..\build\windows\x64\runner\Release"

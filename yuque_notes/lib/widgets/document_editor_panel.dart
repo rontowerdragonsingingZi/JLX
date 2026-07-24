@@ -310,26 +310,19 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
   List<Widget> _buildHeaderActions({required bool compact}) {
     final actions = <Widget>[];
     if (widget.canSyncToCommunity && widget.onSyncToCommunity != null) {
-      if (_isSynced) {
-        actions.add(
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: Chip(
-              key: const Key('synced_to_community_badge'),
-              label: Text(context.l10n.alreadyUploaded),
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-        );
-      }
-      // 手机 / 桌面都用带文字按钮，避免只剩图标时“功能不见了”。
+      // 图标与未上传一致；已上传仅改文案并禁用，无悬浮提示。
       actions.add(
         TextButton.icon(
-          key: const Key('sync_to_community_button'),
-          onPressed: _syncing ? null : _syncToCommunity,
+          key: _isSynced
+              ? const Key('synced_to_community_badge')
+              : const Key('sync_to_community_button'),
+          onPressed: (_isSynced || _syncing) ? null : _syncToCommunity,
           icon: _buildBusyIcon(_syncing, Icons.cloud_upload_outlined),
-          label: Text(context.l10n.uploadCloud),
+          label: Text(
+            _isSynced
+                ? context.l10n.uploadedCloud
+                : context.l10n.uploadCloud,
+          ),
         ),
       );
     }
