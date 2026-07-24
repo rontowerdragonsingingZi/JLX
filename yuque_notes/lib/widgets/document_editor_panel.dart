@@ -5,6 +5,7 @@ import '../data/models/document.dart' as models;
 import '../editor/editor_persistence.dart';
 import '../editor/image_storage.dart';
 import '../editor/snippet_block.dart';
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive_layout.dart';
 import 'mobile_format_panel.dart';
@@ -104,7 +105,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
       final ok = await onSync();
       if (ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已上传云端')),
+          SnackBar(content: Text(context.l10n.uploadedCloud)),
         );
       }
     } catch (_) {
@@ -127,7 +128,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
       await widget.onSave(markdown);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已保存')),
+          SnackBar(content: Text(context.l10n.saved)),
         );
       }
     } finally {
@@ -311,11 +312,11 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     if (widget.canSyncToCommunity && widget.onSyncToCommunity != null) {
       if (_isSynced) {
         actions.add(
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
             child: Chip(
-              key: Key('synced_to_community_badge'),
-              label: Text('已上传'),
+              key: const Key('synced_to_community_badge'),
+              label: Text(context.l10n.alreadyUploaded),
               visualDensity: VisualDensity.compact,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -328,7 +329,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
           key: const Key('sync_to_community_button'),
           onPressed: _syncing ? null : _syncToCommunity,
           icon: _buildBusyIcon(_syncing, Icons.cloud_upload_outlined),
-          label: const Text('上传云端'),
+          label: Text(context.l10n.uploadCloud),
         ),
       );
     }
@@ -336,7 +337,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
       TextButton.icon(
         onPressed: _saving ? null : _save,
         icon: _buildBusyIcon(_saving, Icons.save_outlined),
-        label: const Text('保存'),
+        label: Text(context.l10n.save),
       ),
     );
     return actions;
@@ -385,12 +386,12 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
             customButtons: [
               QuillToolbarCustomButtonOptions(
                 icon: const Icon(Icons.widgets_outlined, size: 20),
-                tooltip: '插入可复制块',
+                tooltip: context.l10n.insertCopyBlock,
                 onPressed: _insertSnippet,
               ),
               QuillToolbarCustomButtonOptions(
                 icon: const Icon(Icons.image_outlined, size: 20),
-                tooltip: '插入图片',
+                tooltip: context.l10n.insertImage,
                 onPressed: _insertImage,
               ),
               QuillToolbarCustomButtonOptions(
@@ -398,7 +399,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                   Icons.photo_size_select_large_outlined,
                   size: 20,
                 ),
-                tooltip: '调整图片大小',
+                tooltip: context.l10n.resizeImage,
                 onPressed: _resizeSelectedImage,
               ),
             ],
@@ -410,6 +411,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
 
   /// 手机：仅保留入口条，完整格式项放进右侧可开关侧栏。
   Widget _buildMobileFormatBar(AppThemeColors colors) {
+    final l10n = context.l10n;
     return Material(
       color: colors.sidebar,
       child: Padding(
@@ -426,22 +428,24 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                     ? Icons.keyboard_double_arrow_right
                     : Icons.text_format,
               ),
-              label: Text(_formatPanelOpen ? '收起格式' : '格式工具'),
+              label: Text(
+                _formatPanelOpen ? l10n.collapseFormat : l10n.formatTools,
+              ),
             ),
             const SizedBox(width: 8),
             IconButton(
-              tooltip: '撤销',
+              tooltip: l10n.undo,
               onPressed: _controller.hasUndo ? _controller.undo : null,
               icon: const Icon(Icons.undo, size: 20),
             ),
             IconButton(
-              tooltip: '重做',
+              tooltip: l10n.redo,
               onPressed: _controller.hasRedo ? _controller.redo : null,
               icon: const Icon(Icons.redo, size: 20),
             ),
             const Spacer(),
             Text(
-              '点「格式工具」查看全部功能',
+              l10n.formatToolsHint,
               style: TextStyle(fontSize: 11, color: colors.textSecondary),
             ),
           ],
@@ -463,7 +467,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
           focusNode: _focusNode,
           scrollController: _scrollController,
           config: QuillEditorConfig(
-            placeholder: '开始记录...',
+            placeholder: context.l10n.startWriting,
             padding: EdgeInsets.zero,
             autoFocus: false,
             expands: false,
@@ -524,7 +528,7 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
                 IconButton(
                   key: const Key('document_back_button'),
                   icon: const Icon(Icons.arrow_back),
-                  tooltip: '返回目录',
+                  tooltip: context.l10n.backToLibrary,
                   onPressed: widget.onBack,
                 ),
               Expanded(

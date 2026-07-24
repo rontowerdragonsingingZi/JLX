@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_branding.dart';
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
 /// 底部「联系我们」入口打开的说明 + 联系方式模态框。
@@ -15,12 +16,6 @@ Future<void> showContactUsDialog(BuildContext context) {
 class ContactUsDialog extends StatelessWidget {
   const ContactUsDialog({super.key});
 
-  static const String aboutText =
-      'NoteYourNeed（记你需）是一款个人开发的记事软件，如不登录论坛进行同步，则不会进行任何网络链接，保证您信息的安全性。'
-      '但我们并不建议您在此存储助记词等极其极其重要的信息。'
-      '如果有任何您想要加入的功能与建议，请联系我们，在确保该更新与反馈属实后我们会及时进行更新，欢迎您的使用。'
-      '希望NN能够给您带来实际的生活便利。^_^';
-
   static const String gmail = 'yb8495812@gmail.com';
   static const String qqMail = 'yabo2003@qq.com';
 
@@ -30,13 +25,14 @@ class ContactUsDialog extends StatelessWidget {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已复制$label')),
+      SnackBar(content: Text(context.l10n.copiedLabel(label))),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final l10n = context.l10n;
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
     final maxWidth = compact ? width - 32.0 : 520.0;
@@ -60,7 +56,7 @@ class ContactUsDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '联系我们',
+                      l10n.contactUs,
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
@@ -69,7 +65,7 @@ class ContactUsDialog extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    tooltip: '关闭',
+                    tooltip: l10n.close,
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                   ),
@@ -94,7 +90,7 @@ class ContactUsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      aboutText,
+                      l10n.contactAbout,
                       style: TextStyle(
                         fontSize: 14,
                         height: 1.55,
@@ -103,7 +99,7 @@ class ContactUsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      '联系方式',
+                      l10n.contactMethods,
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -115,16 +111,16 @@ class ContactUsDialog extends StatelessWidget {
                       spacing: 12,
                       runSpacing: 12,
                       alignment: WrapAlignment.center,
-                      children: const [
-                        _QrCard(
+                      children: [
+                        const _QrCard(
                           title: 'QQ',
                           assetPath: 'assets/images/contact/qq_qr.png',
                         ),
                         _QrCard(
-                          title: '微信',
+                          title: l10n.wechat,
                           assetPath: 'assets/images/contact/wechat_qr.png',
                         ),
-                        _QrCard(
+                        const _QrCard(
                           title: 'Telegram',
                           assetPath: 'assets/images/contact/tg_qr.png',
                         ),
@@ -138,9 +134,9 @@ class ContactUsDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     _EmailTile(
-                      label: 'QQ邮箱',
+                      label: l10n.qqMail,
                       email: qqMail,
-                      onCopy: () => _copy(context, qqMail, 'QQ邮箱'),
+                      onCopy: () => _copy(context, qqMail, l10n.qqMail),
                     ),
                   ],
                 ),
@@ -199,7 +195,7 @@ class _QrCard extends StatelessWidget {
                 height: size,
                 child: Center(
                   child: Text(
-                    '二维码加载失败',
+                    context.l10n.qrLoadFailed,
                     style: TextStyle(fontSize: 12, color: colors.error),
                   ),
                 ),
@@ -261,7 +257,7 @@ class _EmailTile extends StatelessWidget {
                 ),
               ),
               Text(
-                '复制',
+                context.l10n.copy,
                 style: TextStyle(fontSize: 13, color: colors.primary),
               ),
             ],

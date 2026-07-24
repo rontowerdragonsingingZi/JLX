@@ -38,14 +38,14 @@ class FolderRepository {
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
-      throw RepositoryException('文件夹名称不能为空');
+      throw RepositoryException('文件夹名称不能为空 / Folder name cannot be empty');
     }
 
     final db = await _databaseHelper.database;
     if (parentId != null) {
       final parent = await getFolder(userId: userId, folderId: parentId);
       if (parent == null) {
-        throw RepositoryException('父文件夹不存在');
+        throw RepositoryException('父文件夹不存在 / Parent folder not found');
       }
     }
 
@@ -54,7 +54,10 @@ class FolderRepository {
       parentId: parentId,
       name: trimmed,
     )) {
-      throw RepositoryException('该级文件夹名称不能重复，请创建一个次级文件夹');
+      throw RepositoryException(
+        '该级文件夹名称不能重复，请创建一个次级文件夹 / '
+        'A folder with this name already exists at this level. Create a subfolder instead.',
+      );
     }
 
     final now = DateTime.now();
@@ -154,12 +157,12 @@ class FolderRepository {
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
-      throw RepositoryException('文件夹名称不能为空');
+      throw RepositoryException('文件夹名称不能为空 / Folder name cannot be empty');
     }
 
     final folder = await getFolder(userId: userId, folderId: folderId);
     if (folder == null) {
-      throw RepositoryException('文件夹不存在');
+      throw RepositoryException('文件夹不存在 / Folder not found');
     }
 
     if (await hasSiblingFolderName(
@@ -168,7 +171,10 @@ class FolderRepository {
       name: trimmed,
       excludeFolderId: folderId,
     )) {
-      throw RepositoryException('该级文件夹名称不能重复，请创建一个次级文件夹');
+      throw RepositoryException(
+        '该级文件夹名称不能重复，请创建一个次级文件夹 / '
+        'A folder with this name already exists at this level. Create a subfolder instead.',
+      );
     }
 
     final now = DateTime.now();

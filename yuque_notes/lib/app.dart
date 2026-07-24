@@ -4,9 +4,11 @@ import 'package:flutter_quill/flutter_quill.dart';
 
 import 'app_branding.dart';
 import 'data/models/user.dart';
+import 'l10n/app_localizations.dart';
 import 'screens/workspace/workspace_screen.dart';
 import 'services/cloud_auth_api.dart';
 import 'services/local_user_service.dart';
+import 'services/locale_service.dart';
 import 'services/session_service.dart';
 import 'services/theme_service.dart';
 import 'theme/app_theme.dart';
@@ -25,10 +27,12 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
   final _sessionService = SessionService();
   final _localUserService = LocalUserService();
   final _themeService = ThemeService();
+  final _localeService = LocaleService();
   bool _ready = false;
   User? _localUser;
   User? _cloudUser;
   ThemeMode _themeMode = ThemeMode.light;
+  Locale _locale = LocaleService.zhCN;
 
   @override
   void initState() {
@@ -38,6 +42,7 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
 
   Future<void> _bootstrap() async {
     final themeMode = await _themeService.getThemeMode();
+    final locale = await _localeService.getLocale();
     final cloudSession = await _sessionService.getCloudSession();
     final localUser = await _localUserService.resolveActiveLocalUser(
       cloudSession: cloudSession,
@@ -47,6 +52,7 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
     }
     setState(() {
       _themeMode = themeMode;
+      _locale = locale;
       _localUser = localUser;
       _cloudUser = cloudSession?.toDisplayUser();
       _ready = true;
@@ -62,6 +68,14 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
     setState(() => _themeMode = next);
   }
 
+  Future<void> _setLocale(Locale locale) async {
+    await _localeService.saveLocale(locale);
+    if (!mounted) {
+      return;
+    }
+    setState(() => _locale = locale);
+  }
+
   Future<void> _onCloudAuthChanged(User? cloudUser) async {
     final cloudSession = cloudUser == null
         ? null
@@ -72,7 +86,6 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
     if (!mounted) {
       return;
     }
-    // 仅更新用户，不重建 WorkspaceScreen，保留当前打开的文档与编辑状态。
     setState(() {
       _cloudUser = cloudUser;
       _localUser = localUser;
@@ -81,22 +94,20 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
 
   @override
   Widget build(BuildContext context) {
-    // theme / darkTheme 对 Windows 与 Android 同时生效，无平台分支。
     return MaterialApp(
       title: AppBranding.fullName,
       debugShowCheckedModeBanner: false,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: _themeMode,
+      locale: _locale,
+      supportedLocales: LocaleService.supportedLocales,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('zh', 'CN'),
-        Locale('en', 'US'),
       ],
       home: !_ready || _localUser == null
           ? const _SplashScreen()
@@ -107,6 +118,8 @@ class _YuqueNotesAppState extends State<YuqueNotesApp> {
               cloudAuthApi: widget.cloudAuthApi,
               themeMode: _themeMode,
               onToggleTheme: _toggleTheme,
+              locale: _locale,
+              onLocaleChanged: _setLocale,
             ),
     );
   }

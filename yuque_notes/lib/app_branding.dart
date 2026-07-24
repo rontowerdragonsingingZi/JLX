@@ -8,10 +8,6 @@ class AppBranding {
   /// 手机桌面图标下的短名。
   static const String shortName = 'NN';
 
-  /// 论坛名称（登录/注册文案）。
+  /// 论坛名称（登录/注册文案，展示用；UI 文案请用 l10n）。
   static const String forumName = 'NN论坛';
-
-  static String get loginTitle => '登录$forumName';
-
-  static String get registerTitle => '注册$forumName';
 }

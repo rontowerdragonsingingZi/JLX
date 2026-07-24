@@ -1,5 +1,7 @@
 # Bump Flutter pubspec patch version and build number, sync Inno Setup MyAppVersion.
 # Example: 1.0.1+1 -> 1.0.2+2
+# NOTE: Keep this file ASCII-only (or UTF-8 with BOM). PowerShell 5.x on Chinese
+# Windows parses BOM-less UTF-8 as system ANSI and can swallow newlines after CJK.
 
 param(
   [Parameter(Mandatory = $true)]
@@ -24,9 +26,9 @@ $minor = [int]$Matches[2]
 $patch = [int]$Matches[3]
 $build = [int]$Matches[4]
 
-# 小版本：patch +1，同时 build number +1（Android/安装识别）
-$patch++
-$build++
+# bump patch and build number
+$patch = $patch + 1
+$build = $build + 1
 $newName = "$major.$minor.$patch"
 $newFull = "$newName+$build"
 

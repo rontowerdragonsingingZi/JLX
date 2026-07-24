@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
+
 Future<String?> showNameDialog({
   required BuildContext context,
   required String title,
@@ -10,6 +12,7 @@ Future<String?> showNameDialog({
   return showDialog<String>(
     context: context,
     builder: (context) {
+      final l10n = context.l10n;
       return AlertDialog(
         title: Text(title),
         content: TextField(
@@ -21,11 +24,11 @@ Future<String?> showNameDialog({
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('确定'),
+            child: Text(l10n.ok),
           ),
         ],
       );

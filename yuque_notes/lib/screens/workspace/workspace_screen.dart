@@ -13,6 +13,8 @@ import '../../services/community_sync_service.dart';
 import '../../services/notebook_transfer_service.dart';
 import '../../services/session_service.dart';
 import '../../app_branding.dart';
+import '../../l10n/app_localizations.dart';
+import '../../services/locale_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/responsive_layout.dart';
 import '../../widgets/app_feedback_dialog.dart';
@@ -36,6 +38,8 @@ class WorkspaceScreen extends StatefulWidget {
     this.initialSelectedDocument,
     this.themeMode = ThemeMode.light,
     this.onToggleTheme,
+    this.locale = LocaleService.zhCN,
+    this.onLocaleChanged,
   })  : _cloudAuthApi = cloudAuthApi,
         _avatarService = avatarService,
         _communitySyncService = communitySyncService;
@@ -45,6 +49,8 @@ class WorkspaceScreen extends StatefulWidget {
   final Document? initialSelectedDocument;
   final ThemeMode themeMode;
   final VoidCallback? onToggleTheme;
+  final Locale locale;
+  final Future<void> Function(Locale locale)? onLocaleChanged;
   final Future<void> Function(User? cloudUser) onCloudAuthChanged;
   final CloudAuthApi? _cloudAuthApi;
   final AvatarService? _avatarService;
@@ -143,10 +149,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   Future<void> _createFolder(int? parentId) async {
+    final l10n = context.l10n;
     final name = await showNameDialog(
       context: context,
-      title: '新建文件夹',
-      hint: '文件夹名称',
+      title: l10n.newFolder,
+      hint: l10n.folderName,
     );
     if (name == null || name.trim().isEmpty) {
       return;
@@ -164,10 +171,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   Future<void> _createDocument(int folderId) async {
+    final l10n = context.l10n;
     final title = await showNameDialog(
       context: context,
-      title: '新建文档',
-      hint: '文档标题',
+      title: l10n.newDocument,
+      hint: l10n.documentTitle,
     );
     if (title == null || title.trim().isEmpty) {
       return;
@@ -213,16 +221,23 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
   }
 
   Future<void> _delete({int? folderId, int? documentId}) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(folderId != null ? '删除文件夹' : '删除文档'),
+        title: Text(folderId != null ? l10n.deleteFolder : l10n.deleteDocument),
         content: Text(folderId != null
-            ? '确定删除该文件夹及其所有子内容？'
-            : '确定删除该文档？'),
+            ? l10n.deleteFolderConfirm
+            : l10n.deleteDocumentConfirm),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.delete),
+          ),
         ],
       ),
     );
@@ -259,8 +274,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   void _showError(String message) {
     // 文件夹重名等业务错误：弹窗更明确
-    if (message.contains('不能重复') || message.contains('不能为空')) {
-      _showErrorDialog('操作失败', message);
+    if (message.contains('不能重复') ||
+        message.contains('不能为空') ||
+        message.contains('already exists') ||
+        message.contains('cannot be empty')) {
+      _showErrorDialog(context.l10n.operationFailed, message);
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -300,12 +318,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已导出：$path')),
+        SnackBar(content: Text(context.l10n.exportedTo(path))),
       );
     } on NotebookTransferException catch (e) {
-      await _showErrorDialog('导出失败', e.message);
+      await _showErrorDialog(context.l10n.exportFailed, e.message);
     } catch (e) {
-      await _showErrorDialog('导出失败', e.toString());
+      await _showErrorDialog(context.l10n.exportFailed, e.toString());
     } finally {
       if (mounted) {
         setState(() => _transferBusy = false);
@@ -332,16 +350,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '导入完成：新建文件夹 ${result.foldersImported} 个，文档 ${result.documentsImported} 篇',
+            context.l10n.importDone(
+              result.foldersImported,
+              result.documentsImported,
+            ),
           ),
         ),
       );
     } on NotebookTransferException catch (e) {
-      await _showErrorDialog('导入失败', e.message);
+      await _showErrorDialog(context.l10n.importFailed, e.message);
     } on RepositoryException catch (e) {
-      await _showErrorDialog('导入失败', e.message);
+      await _showErrorDialog(context.l10n.importFailed, e.message);
     } catch (e) {
-      await _showErrorDialog('导入失败', e.toString());
+      await _showErrorDialog(context.l10n.importFailed, e.toString());
     } finally {
       if (mounted) {
         setState(() => _transferBusy = false);
@@ -526,8 +547,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       }
       await showSuccessDialog(
         context,
-        title: '退出登录成功',
-        message: '您已退出云端账号，本地笔记仍保留在本机。',
+        title: context.l10n.logoutSuccess,
+        message: context.l10n.logoutSuccessMsg,
       );
     } catch (e) {
       if (!mounted) {
@@ -535,7 +556,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       }
       await showErrorDialog(
         context,
-        title: '退出登录失败',
+        title: context.l10n.logoutFailed,
         message: e.toString(),
       );
     }
@@ -560,7 +581,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '请登录',
+                  context.l10n.pleaseLogin,
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -575,6 +596,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
 
     final cloudUser = widget.cloudUser!;
+    final l10n = context.l10n;
     return Row(
       children: [
         UserAvatar(
@@ -595,7 +617,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               Text(
-                '点击头像更换',
+                l10n.tapAvatarToChange,
                 style: TextStyle(
                   fontSize: 11,
                   color: colors.textSecondary,
@@ -630,6 +652,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
 
   Widget _buildLibraryHeader({required bool compact}) {
     final isDark = widget.themeMode == ThemeMode.dark;
+    final l10n = context.l10n;
+    final isEn = widget.locale.languageCode == 'en';
     return Padding(
       padding: EdgeInsets.fromLTRB(16, compact ? 8 : 16, 8, 8),
       child: Row(
@@ -638,7 +662,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              // 应用内全名；手机桌面图标短名见 Android label「NN」。
               AppBranding.fullName,
               style: const TextStyle(
                 fontSize: 16,
@@ -646,19 +669,41 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
               ),
             ),
           ),
+          PopupMenuButton<String>(
+            key: const Key('language_menu_button'),
+            tooltip: l10n.language,
+            icon: const Icon(Icons.language, size: 20),
+            onSelected: (value) {
+              final next =
+                  value == 'en' ? LocaleService.enUS : LocaleService.zhCN;
+              widget.onLocaleChanged?.call(next);
+            },
+            itemBuilder: (context) => [
+              CheckedPopupMenuItem<String>(
+                value: 'zh',
+                checked: !isEn,
+                child: Text(l10n.languageZh),
+              ),
+              CheckedPopupMenuItem<String>(
+                value: 'en',
+                checked: isEn,
+                child: Text(l10n.languageEn),
+              ),
+            ],
+          ),
           IconButton(
             key: const Key('theme_toggle_button'),
             icon: Icon(
               isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
               size: 20,
             ),
-            tooltip: isDark ? '日间模式' : '黑夜模式',
+            tooltip: isDark ? l10n.dayMode : l10n.nightMode,
             onPressed: widget.onToggleTheme,
           ),
           if (_isCloudLoggedIn)
             IconButton(
               icon: const Icon(Icons.logout, size: 20),
-              tooltip: '退出登录',
+              tooltip: l10n.logout,
               onPressed: _logout,
             ),
         ],
@@ -738,7 +783,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.file_upload_outlined, size: 18),
-                      label: const Text('导出'),
+                      label: Text(context.l10n.export),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -748,7 +793,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       onPressed: _transferBusy ? null : _importNotebook,
                       style: buildAppOutlinedButtonStyle(colors),
                       icon: const Icon(Icons.file_download_outlined, size: 18),
-                      label: const Text('导入'),
+                      label: Text(context.l10n.import),
                     ),
                   ),
                 ],
@@ -769,7 +814,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        '联系我们',
+                        context.l10n.contactUs,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
@@ -895,7 +940,7 @@ class _WelcomePanel extends StatelessWidget {
             AppLogo(size: compact ? 96 : 140),
             const SizedBox(height: 16),
             Text(
-              '选择或创建一个文档开始记录',
+              context.l10n.selectOrCreateDoc,
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: colors.textSecondary),
             ),

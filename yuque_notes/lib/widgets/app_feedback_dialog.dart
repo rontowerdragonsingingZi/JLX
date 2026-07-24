@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
 enum AppFeedbackType { success, error }
@@ -10,7 +11,7 @@ Future<void> showAppFeedbackDialog(
   required AppFeedbackType type,
   required String title,
   required String message,
-  String confirmText = '确定',
+  String? confirmText,
 }) {
   return showDialog<void>(
     context: context,
@@ -19,7 +20,7 @@ Future<void> showAppFeedbackDialog(
       type: type,
       title: title,
       message: message,
-      confirmText: confirmText,
+      confirmText: confirmText ?? context.l10n.ok,
     ),
   );
 }
@@ -56,13 +57,13 @@ class AppFeedbackDialog extends StatelessWidget {
     required this.type,
     required this.title,
     required this.message,
-    this.confirmText = '确定',
+    this.confirmText,
   });
 
   final AppFeedbackType type;
   final String title;
   final String message;
-  final String confirmText;
+  final String? confirmText;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +71,7 @@ class AppFeedbackDialog extends StatelessWidget {
     final isSuccess = type == AppFeedbackType.success;
     final accent = isSuccess ? colors.primary : colors.error;
     final icon = isSuccess ? Icons.check_circle_outline : Icons.error_outline;
+    final buttonText = confirmText ?? context.l10n.ok;
 
     return Dialog(
       backgroundColor: colors.sidebar,
@@ -117,7 +119,7 @@ class AppFeedbackDialog extends StatelessWidget {
                 child: isSuccess
                     ? ElevatedButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: Text(confirmText),
+                        child: Text(buttonText),
                       )
                     : OutlinedButton(
                         onPressed: () => Navigator.of(context).pop(),
@@ -127,7 +129,7 @@ class AppFeedbackDialog extends StatelessWidget {
                             BorderSide(color: accent.withValues(alpha: 0.55)),
                           ),
                         ),
-                        child: Text(confirmText),
+                        child: Text(buttonText),
                       ),
               ),
             ],

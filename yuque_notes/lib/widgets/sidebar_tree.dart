@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/models/document.dart';
 import '../data/models/folder.dart';
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../utils/responsive_layout.dart';
 import 'name_dialog.dart';
@@ -50,6 +51,7 @@ class _SidebarTreeState extends State<SidebarTree> {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final l10n = context.l10n;
     final compact = isCompactLayout(context);
     final roots = _childrenOf(null);
     return Column(
@@ -63,7 +65,7 @@ class _SidebarTreeState extends State<SidebarTree> {
                   onPressed: () => widget.onCreateFolder(null),
                   style: buildAppOutlinedButtonStyle(colors),
                   icon: const Icon(Icons.create_new_folder_outlined, size: 18),
-                  label: const Text('新建文件夹'),
+                  label: Text(l10n.newFolder),
                 ),
               ),
             ],
@@ -75,7 +77,7 @@ class _SidebarTreeState extends State<SidebarTree> {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Text(
-                      '暂无内容，请创建文件夹',
+                      l10n.emptyLibrary,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: colors.textSecondary),
                     ),
@@ -150,8 +152,8 @@ class _SidebarTreeState extends State<SidebarTree> {
                     onRename: () async {
                       final name = await showNameDialog(
                         context: context,
-                        title: '重命名文件夹',
-                        hint: '文件夹名称',
+                        title: context.l10n.renameFolder,
+                        hint: context.l10n.folderName,
                         initialValue: folder.name,
                       );
                       if (name != null && name.trim().isNotEmpty) {
@@ -221,8 +223,8 @@ class _SidebarTreeState extends State<SidebarTree> {
                 onRename: () async {
                   final name = await showNameDialog(
                     context: context,
-                    title: '重命名文档',
-                    hint: '文档标题',
+                    title: context.l10n.renameDocument,
+                    hint: context.l10n.documentTitle,
                     initialValue: document.title,
                   );
                   if (name != null && name.trim().isNotEmpty) {
@@ -260,14 +262,17 @@ class _SidebarTreeState extends State<SidebarTree> {
             onAddDocument?.call();
         }
       },
-      itemBuilder: (context) => [
-        if (onAddFolder != null)
-          const PopupMenuItem(value: 'add_folder', child: Text('新建子文件夹')),
-        if (onAddDocument != null)
-          const PopupMenuItem(value: 'add_document', child: Text('新建文档')),
-        const PopupMenuItem(value: 'rename', child: Text('重命名')),
-        const PopupMenuItem(value: 'delete', child: Text('删除')),
-      ],
+      itemBuilder: (context) {
+        final l10n = context.l10n;
+        return [
+          if (onAddFolder != null)
+            PopupMenuItem(value: 'add_folder', child: Text(l10n.newSubfolder)),
+          if (onAddDocument != null)
+            PopupMenuItem(value: 'add_document', child: Text(l10n.newDocument)),
+          PopupMenuItem(value: 'rename', child: Text(l10n.rename)),
+          PopupMenuItem(value: 'delete', child: Text(l10n.delete)),
+        ];
+      },
     );
   }
 }

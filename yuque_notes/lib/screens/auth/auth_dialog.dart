@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app_branding.dart';
 import '../../data/models/cloud_auth_result.dart';
+import '../../l10n/app_localizations.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/forum/forum_cloud_auth_api.dart';
 import '../../theme/app_theme.dart';
@@ -56,9 +57,10 @@ class _AuthDialogState extends State<AuthDialog> {
   }
 
   Future<void> _sendVerificationCode() async {
+    final l10n = context.l10n;
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      setState(() => _error = '请输入邮箱');
+      setState(() => _error = l10n.enterEmail);
       return;
     }
 
@@ -76,8 +78,8 @@ class _AuthDialogState extends State<AuthDialog> {
       }
       setState(() {
         _info = retryAfterSeconds == null
-            ? '验证码已发送'
-            : '验证码已发送，${retryAfterSeconds} 秒后可再次发送';
+            ? l10n.codeSent
+            : l10n.codeSentRetry(retryAfterSeconds);
       });
     } on CloudAuthException catch (e) {
       if (mounted) {
@@ -91,17 +93,19 @@ class _AuthDialogState extends State<AuthDialog> {
   }
 
   Future<void> _submit() async {
-    if (_mode == _AuthMode.register) {
+    final l10n = context.l10n;
+    final isLogin = _mode == _AuthMode.login;
+    if (!isLogin) {
       if (_passwordController.text != _confirmController.text) {
-        setState(() => _error = '两次输入的密码不一致');
+        setState(() => _error = l10n.passwordMismatch);
         return;
       }
       if (_emailController.text.trim().isEmpty) {
-        setState(() => _error = '请输入邮箱');
+        setState(() => _error = l10n.enterEmail);
         return;
       }
       if (_verificationCodeController.text.trim().isEmpty) {
-        setState(() => _error = '请输入验证码');
+        setState(() => _error = l10n.enterCode);
         return;
       }
     }
@@ -112,7 +116,6 @@ class _AuthDialogState extends State<AuthDialog> {
       _info = null;
     });
 
-    final isLogin = _mode == _AuthMode.login;
     try {
       final CloudAuthResult result;
       if (isLogin) {
@@ -134,10 +137,10 @@ class _AuthDialogState extends State<AuthDialog> {
       setState(() => _loading = false);
       await showSuccessDialog(
         context,
-        title: isLogin ? '登录成功' : '注册成功',
+        title: isLogin ? l10n.loginSuccess : l10n.registerSuccess,
         message: isLogin
-            ? '欢迎回来，${result.username}！'
-            : '账号 ${result.username} 已创建，欢迎使用 ${AppBranding.fullName}。',
+            ? l10n.welcomeBack(result.username)
+            : l10n.accountCreated(result.username, AppBranding.fullName),
       );
       if (!mounted) {
         return;
@@ -153,7 +156,7 @@ class _AuthDialogState extends State<AuthDialog> {
       });
       await showErrorDialog(
         context,
-        title: isLogin ? '登录失败' : '注册失败',
+        title: isLogin ? l10n.loginFailed : l10n.registerFailed,
         message: e.message,
       );
     } catch (e) {
@@ -167,7 +170,7 @@ class _AuthDialogState extends State<AuthDialog> {
       });
       await showErrorDialog(
         context,
-        title: isLogin ? '登录失败' : '注册失败',
+        title: isLogin ? l10n.loginFailed : l10n.registerFailed,
         message: msg,
       );
     } finally {
@@ -181,6 +184,7 @@ class _AuthDialogState extends State<AuthDialog> {
   Widget build(BuildContext context) {
     final isLogin = _mode == _AuthMode.login;
     final colors = context.appColors;
+    final l10n = context.l10n;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
     final compact = screenWidth < 720;
@@ -205,7 +209,7 @@ class _AuthDialogState extends State<AuthDialog> {
               Center(child: AppLogo(size: compact ? 64 : 88)),
               const SizedBox(height: 16),
               Text(
-                isLogin ? AppBranding.loginTitle : AppBranding.registerTitle,
+                isLogin ? l10n.loginForum : l10n.registerForum,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 20,
@@ -216,13 +220,13 @@ class _AuthDialogState extends State<AuthDialog> {
               const SizedBox(height: 28),
               TextField(
                 controller: _usernameController,
-                decoration: const InputDecoration(labelText: '用户名'),
+                decoration: InputDecoration(labelText: l10n.username),
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: '密码'),
+                decoration: InputDecoration(labelText: l10n.password),
                 obscureText: true,
                 textInputAction:
                     isLogin ? TextInputAction.done : TextInputAction.next,
@@ -232,14 +236,14 @@ class _AuthDialogState extends State<AuthDialog> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _confirmController,
-                  decoration: const InputDecoration(labelText: '确认密码'),
+                  decoration: InputDecoration(labelText: l10n.confirmPassword),
                   obscureText: true,
                   textInputAction: TextInputAction.next,
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _emailController,
-                  decoration: const InputDecoration(labelText: '邮箱'),
+                  decoration: InputDecoration(labelText: l10n.email),
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                 ),
@@ -247,7 +251,8 @@ class _AuthDialogState extends State<AuthDialog> {
                 if (compact) ...[
                   TextField(
                     controller: _verificationCodeController,
-                    decoration: const InputDecoration(labelText: '邮箱验证码'),
+                    decoration:
+                        InputDecoration(labelText: l10n.verificationCode),
                     textInputAction: TextInputAction.done,
                     onSubmitted: (_) => _submit(),
                   ),
@@ -264,7 +269,7 @@ class _AuthDialogState extends State<AuthDialog> {
                               width: 18,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('发送验证码'),
+                          : Text(l10n.sendCode),
                     ),
                   ),
                 ] else
@@ -274,8 +279,9 @@ class _AuthDialogState extends State<AuthDialog> {
                       Expanded(
                         child: TextField(
                           controller: _verificationCodeController,
-                          decoration:
-                              const InputDecoration(labelText: '邮箱验证码'),
+                          decoration: InputDecoration(
+                            labelText: l10n.verificationCode,
+                          ),
                           textInputAction: TextInputAction.done,
                           onSubmitted: (_) => _submit(),
                         ),
@@ -295,7 +301,7 @@ class _AuthDialogState extends State<AuthDialog> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('发送验证码'),
+                              : Text(l10n.sendCode),
                         ),
                       ),
                     ],
@@ -327,14 +333,14 @@ class _AuthDialogState extends State<AuthDialog> {
                           color: Colors.white,
                         ),
                       )
-                    : Text(isLogin ? '登录' : '注册'),
+                    : Text(isLogin ? l10n.login : l10n.register),
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    isLogin ? '还没有账号？' : '已有账号？',
+                    isLogin ? l10n.noAccount : l10n.hasAccount,
                     style: TextStyle(color: colors.textSecondary),
                   ),
                   TextButton(
@@ -349,7 +355,7 @@ class _AuthDialogState extends State<AuthDialog> {
                               _info = null;
                             });
                           },
-                    child: Text(isLogin ? '注册' : '登录'),
+                    child: Text(isLogin ? l10n.register : l10n.login),
                   ),
                 ],
               ),

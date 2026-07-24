@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 
 /// 手机端富文本格式侧栏：每项带简短 title，便于无 hover 时理解功能。
@@ -58,6 +59,15 @@ class MobileFormatPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
+    final l10n = context.l10n;
+    final colorEntries = <MapEntry<String, Color>>[
+      MapEntry(l10n.colorBlack, const Color(0xFF262626)),
+      MapEntry(l10n.colorRed, const Color(0xFFE53935)),
+      MapEntry(l10n.colorOrange, const Color(0xFFFB8C00)),
+      MapEntry(l10n.colorGreen, const Color(0xFF00B96B)),
+      MapEntry(l10n.colorBlue, const Color(0xFF1E88E5)),
+      MapEntry(l10n.colorPurple, const Color(0xFF8E24AA)),
+    ];
 
     return Material(
       elevation: 8,
@@ -73,7 +83,7 @@ class MobileFormatPanel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '格式工具',
+                      l10n.formatTools,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -83,7 +93,7 @@ class MobileFormatPanel extends StatelessWidget {
                   ),
                   IconButton(
                     key: const Key('mobile_format_panel_close'),
-                    tooltip: '关闭',
+                    tooltip: l10n.close,
                     onPressed: onClose,
                     icon: const Icon(Icons.close),
                   ),
@@ -98,58 +108,58 @@ class MobileFormatPanel extends StatelessWidget {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(10, 8, 10, 24),
                     children: [
-                      _SectionTitle(title: '编辑', colors: colors),
+                      _SectionTitle(title: l10n.sectionEdit, colors: colors),
                       _FormatTile(
                         icon: Icons.undo,
-                        title: '撤销',
-                        subtitle: '撤销上一步',
+                        title: l10n.undo,
+                        subtitle: l10n.undoHint,
                         colors: colors,
                         onTap: controller.hasUndo ? controller.undo : null,
                       ),
                       _FormatTile(
                         icon: Icons.redo,
-                        title: '重做',
-                        subtitle: '恢复上一步',
+                        title: l10n.redo,
+                        subtitle: l10n.redoHint,
                         colors: colors,
                         onTap: controller.hasRedo ? controller.redo : null,
                       ),
-                      _SectionTitle(title: '文字样式', colors: colors),
+                      _SectionTitle(title: l10n.sectionTextStyle, colors: colors),
                       _FormatTile(
                         icon: Icons.format_bold,
-                        title: '粗体',
-                        subtitle: '加粗选中文字',
+                        title: l10n.bold,
+                        subtitle: l10n.boldHint,
                         selected: _has(Attribute.bold),
                         colors: colors,
                         onTap: () => _toggle(Attribute.bold),
                       ),
                       _FormatTile(
                         icon: Icons.format_italic,
-                        title: '斜体',
-                        subtitle: '倾斜选中文字',
+                        title: l10n.italic,
+                        subtitle: l10n.italicHint,
                         selected: _has(Attribute.italic),
                         colors: colors,
                         onTap: () => _toggle(Attribute.italic),
                       ),
                       _FormatTile(
                         icon: Icons.format_underlined,
-                        title: '下划线',
-                        subtitle: '添加下划线',
+                        title: l10n.underline,
+                        subtitle: l10n.underlineHint,
                         selected: _has(Attribute.underline),
                         colors: colors,
                         onTap: () => _toggle(Attribute.underline),
                       ),
                       _FormatTile(
                         icon: Icons.strikethrough_s,
-                        title: '删除线',
-                        subtitle: '添加删除线',
+                        title: l10n.strikethrough,
+                        subtitle: l10n.strikethroughHint,
                         selected: _has(Attribute.strikeThrough),
                         colors: colors,
                         onTap: () => _toggle(Attribute.strikeThrough),
                       ),
                       _FormatTile(
                         icon: Icons.format_clear,
-                        title: '清除格式',
-                        subtitle: '去掉文字样式',
+                        title: l10n.clearFormat,
+                        subtitle: l10n.clearFormatHint,
                         colors: colors,
                         onTap: () {
                           for (final key in [
@@ -169,11 +179,11 @@ class MobileFormatPanel extends StatelessWidget {
                           }
                         },
                       ),
-                      _SectionTitle(title: '字号', colors: colors),
+                      _SectionTitle(title: l10n.sectionFontSize, colors: colors),
                       _FormatTile(
                         icon: Icons.text_fields,
-                        title: '默认',
-                        subtitle: '恢复默认字号',
+                        title: l10n.sizeDefault,
+                        subtitle: l10n.sizeDefaultHint,
                         selected: !_hasKey(Attribute.size.key),
                         colors: colors,
                         onTap: () => _applyOrClear(
@@ -183,39 +193,39 @@ class MobileFormatPanel extends StatelessWidget {
                       ),
                       _FormatTile(
                         icon: Icons.text_decrease,
-                        title: '较小',
-                        subtitle: '字号变小',
+                        title: l10n.sizeSmall,
+                        subtitle: l10n.sizeSmallHint,
                         selected: _has(const SizeAttribute('small')),
                         colors: colors,
-                        onTap: () =>
-                            controller.formatSelection(const SizeAttribute('small')),
+                        onTap: () => controller
+                            .formatSelection(const SizeAttribute('small')),
                       ),
                       _FormatTile(
                         icon: Icons.text_increase,
-                        title: '较大',
-                        subtitle: '字号变大',
+                        title: l10n.sizeLarge,
+                        subtitle: l10n.sizeLargeHint,
                         selected: _has(const SizeAttribute('large')),
                         colors: colors,
-                        onTap: () =>
-                            controller.formatSelection(const SizeAttribute('large')),
+                        onTap: () => controller
+                            .formatSelection(const SizeAttribute('large')),
                       ),
                       _FormatTile(
                         icon: Icons.title,
-                        title: '特大',
-                        subtitle: '字号最大',
+                        title: l10n.sizeHuge,
+                        subtitle: l10n.sizeHugeHint,
                         selected: _has(const SizeAttribute('huge')),
                         colors: colors,
-                        onTap: () =>
-                            controller.formatSelection(const SizeAttribute('huge')),
+                        onTap: () => controller
+                            .formatSelection(const SizeAttribute('huge')),
                       ),
-                      _SectionTitle(title: '文字颜色', colors: colors),
+                      _SectionTitle(title: l10n.sectionColor, colors: colors),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            for (final entry in _textColors.entries)
+                            for (final entry in colorEntries)
                               _ColorChip(
                                 label: entry.key,
                                 color: entry.value,
@@ -232,7 +242,7 @@ class MobileFormatPanel extends StatelessWidget {
                                 },
                               ),
                             ActionChip(
-                              label: const Text('默认色'),
+                              label: Text(l10n.colorDefault),
                               side: BorderSide(
                                 color: colors.primary.withValues(alpha: 0.45),
                               ),
@@ -249,64 +259,64 @@ class MobileFormatPanel extends StatelessWidget {
                           ],
                         ),
                       ),
-                      _SectionTitle(title: '段落', colors: colors),
+                      _SectionTitle(title: l10n.sectionParagraph, colors: colors),
                       _FormatTile(
                         icon: Icons.format_quote,
-                        title: '引用',
-                        subtitle: '引用段落',
+                        title: l10n.quote,
+                        subtitle: l10n.quoteHint,
                         selected: _has(Attribute.blockQuote),
                         colors: colors,
                         onTap: () => _toggle(Attribute.blockQuote),
                       ),
                       _FormatTile(
                         icon: Icons.format_list_bulleted,
-                        title: '项目符号',
-                        subtitle: '无序列表',
+                        title: l10n.bulletList,
+                        subtitle: l10n.bulletListHint,
                         selected: _has(Attribute.ul),
                         colors: colors,
                         onTap: () => _toggle(Attribute.ul),
                       ),
                       _FormatTile(
                         icon: Icons.format_list_numbered,
-                        title: '编号列表',
-                        subtitle: '有序列表',
+                        title: l10n.numberedList,
+                        subtitle: l10n.numberedListHint,
                         selected: _has(Attribute.ol),
                         colors: colors,
                         onTap: () => _toggle(Attribute.ol),
                       ),
                       _FormatTile(
                         icon: Icons.format_indent_increase,
-                        title: '增加缩进',
-                        subtitle: '段落向右缩进',
+                        title: l10n.indentMore,
+                        subtitle: l10n.indentMoreHint,
                         colors: colors,
                         onTap: () => controller.indentSelection(true),
                       ),
                       _FormatTile(
                         icon: Icons.format_indent_decrease,
-                        title: '减少缩进',
-                        subtitle: '段落向左缩进',
+                        title: l10n.indentLess,
+                        subtitle: l10n.indentLessHint,
                         colors: colors,
                         onTap: () => controller.indentSelection(false),
                       ),
-                      _SectionTitle(title: '插入', colors: colors),
+                      _SectionTitle(title: l10n.sectionInsert, colors: colors),
                       _FormatTile(
                         icon: Icons.widgets_outlined,
-                        title: '可复制块',
-                        subtitle: '小标题+内容，可一键复制',
+                        title: l10n.copyBlock,
+                        subtitle: l10n.copyBlockHint,
                         colors: colors,
                         onTap: onInsertSnippet,
                       ),
                       _FormatTile(
                         icon: Icons.image_outlined,
-                        title: '插入图片',
-                        subtitle: '从相册选择图片',
+                        title: l10n.insertImage,
+                        subtitle: l10n.insertImageHint,
                         colors: colors,
                         onTap: onInsertImage,
                       ),
                       _FormatTile(
                         icon: Icons.photo_size_select_large_outlined,
-                        title: '图片宽度',
-                        subtitle: '调整选中图片宽度',
+                        title: l10n.imageWidth,
+                        subtitle: l10n.imageWidthHint,
                         colors: colors,
                         onTap: onResizeImage,
                       ),
@@ -321,15 +331,6 @@ class MobileFormatPanel extends StatelessWidget {
     );
   }
 }
-
-const Map<String, Color> _textColors = {
-  '黑': Color(0xFF262626),
-  '红': Color(0xFFE53935),
-  '橙': Color(0xFFFB8C00),
-  '绿': Color(0xFF00B96B),
-  '蓝': Color(0xFF1E88E5),
-  '紫': Color(0xFF8E24AA),
-};
 
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle({required this.title, required this.colors});
