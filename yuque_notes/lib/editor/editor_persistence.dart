@@ -6,8 +6,15 @@ import 'snippet_block.dart';
 
 const int defaultImageWidth = 300;
 
+/// GitHub flavored markdown is required so `- [ ]` / `- [x]` task lists
+/// round-trip through save/reload (markdown_quill maps `task-list-item`).
+final _mdDocument = md.Document(
+  encodeHtml: false,
+  extensionSet: md.ExtensionSet.gitHubFlavored,
+);
+
 final _mdToDelta = MarkdownToDelta(
-  markdownDocument: md.Document(),
+  markdownDocument: _mdDocument,
   customElementToEmbeddable: {
     'img': (attrs) => BlockEmbed.image(attrs['src'] ?? ''),
     'nn-snippet': snippetEmbedFromMarkdownAttrs,
