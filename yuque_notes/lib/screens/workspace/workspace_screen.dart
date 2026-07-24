@@ -10,6 +10,7 @@ import '../../data/repositories/folder_repository.dart';
 import '../../services/avatar_service.dart';
 import '../../services/cloud_auth_api.dart';
 import '../../services/community_sync_service.dart';
+import '../../services/local_user_service.dart';
 import '../../services/notebook_transfer_service.dart';
 import '../../services/session_service.dart';
 import '../../app_branding.dart';
@@ -490,21 +491,39 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     var session = await _sessionService.getCloudSession();
     if (session == null) {
       if (mounted) {
-        _showError('请先登录后再上传云端');
+        _showError(context.l10n.pleaseLoginBeforeUpload);
       }
       return false;
     }
 
-    // 登录后 localUser 可能已切换；游客文档仍不可上传。
-    if (AuthRepository.isLocalGuest(widget.localUser)) {
+    // 登录后父组件可能已切换 localUser；以会话 + 当前文档归属为准。
+    // 注意：await 登录后本帧 widget.localUser 可能仍是旧引用，故以 session 与
+    // 文档 userId 判定，不能只看 isLocalGuest(widget.localUser)。
+    final owner = await AuthRepository().getUserById(_selectedDocument!.userId);
+    if (owner == null || AuthRepository.isLocalGuest(owner)) {
       if (mounted) {
-        _showError('当前为本地游客笔记，请登录社区账号后新建文档再上传');
+        _showError(context.l10n.guestCannotUpload);
+      }
+      return false;
+    }
+
+    // 文档必须属于当前云账号对应的本地用户命名空间。
+    final expectedLocal = await LocalUserService().resolveActiveLocalUser(
+      cloudSession: session,
+    );
+    if (_selectedDocument!.userId != expectedLocal.id) {
+      if (mounted) {
+        _showError(context.l10n.guestCannotUpload);
       }
       return false;
     }
 
     try {
-      await _syncDocumentWithSession(session.accessToken);
+      await _syncDocumentWithSession(
+        accessToken: session.accessToken,
+        forumUserId: session.userId,
+        localUserId: expectedLocal.id,
+      );
       return true;
     } on CommunitySyncException catch (error) {
       if (error.statusCode == 401 && widget._cloudAuthApi != null) {
@@ -513,10 +532,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         );
         if (refreshed != null && refreshed.accessToken != session.accessToken) {
           try {
-            await _syncDocumentWithSession(refreshed.accessToken);
+            await _syncDocumentWithSession(
+              accessToken: refreshed.accessToken,
+              forumUserId: refreshed.userId,
+              localUserId: expectedLocal.id,
+            );
             return true;
           } on CommunitySyncException catch (retryError) {
-            _showError(retryError.message);
+            if (mounted) {
+              _showError(retryError.message);
+            }
             rethrow;
           }
         }
@@ -524,18 +549,28 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           return false;
         }
         await widget.onCloudAuthChanged(null);
-        _showError('登录已过期，请重新登录');
+        if (!mounted) {
+          return false;
+        }
+        _showError(context.l10n.loginExpired);
         return false;
       }
-      _showError(error.message);
+      if (mounted) {
+        _showError(error.message);
+      }
       rethrow;
     }
   }
 
-  Future<void> _syncDocumentWithSession(String accessToken) async {
+  Future<void> _syncDocumentWithSession({
+    required String accessToken,
+    required int forumUserId,
+    required int localUserId,
+  }) async {
     await _communitySyncService.syncDocumentToCommunity(
       documentId: _selectedDocument!.id,
-      localUserId: _localUserId,
+      localUserId: localUserId,
+      forumUserId: forumUserId,
       accessToken: accessToken,
     );
     await _refreshDocument(_selectedDocument!.id);

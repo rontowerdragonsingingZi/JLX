@@ -64,6 +64,7 @@ void main() {
         () => service.syncDocumentToCommunity(
           documentId: document.id,
           localUserId: localUser.id,
+          forumUserId: 42,
           accessToken: 'token',
         ),
         throwsA(
@@ -119,15 +120,25 @@ void main() {
         authRepository: authRepository,
       );
 
+      const forumUserId = 42;
       await service.syncDocumentToCommunity(
         documentId: document.id,
         localUserId: userId,
+        forumUserId: forumUserId,
         accessToken: 'token',
       );
 
       expect(capturedBody, isNotNull);
+      // bssUserId 必须是本机 SQLite users.id（服务端 baseID 绑定）
       expect(capturedBody!['bssUserId'], userId);
-      expect(capturedBody!['bssDocumentId'], document.id);
+      // bssDocumentId 带论坛用户维度，避免全局撞 id
+      expect(
+        capturedBody!['bssDocumentId'],
+        CommunitySyncService.encodeBssDocumentId(
+          forumUserId: forumUserId,
+          localDocumentId: document.id,
+        ),
+      );
       expect(capturedBody!['bssFolderId'], folder.id);
       expect(capturedBody!['bssFolderName'], '工作笔记');
       expect(capturedBody!['title'], '今日开发日志');
@@ -174,6 +185,7 @@ void main() {
       await service.syncDocumentToCommunity(
         documentId: document.id,
         localUserId: userId,
+        forumUserId: 42,
         accessToken: 'token',
       );
 
@@ -186,6 +198,7 @@ void main() {
       await service.syncDocumentToCommunity(
         documentId: document.id,
         localUserId: userId,
+        forumUserId: 42,
         accessToken: 'token',
       );
 
