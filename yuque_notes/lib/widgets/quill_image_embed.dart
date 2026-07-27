@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
+import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'image_zoom_viewer.dart';
 
@@ -162,77 +163,88 @@ class _ResizableQuillImageState extends State<_ResizableQuillImage> {
             gaplessPlayback: true,
           );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: GestureDetector(
-          onTap: widget.readOnly ? null : _selectImage,
-          // 双击：打开单图放大（无前后切换）
-          onDoubleTap: provider == null
-              ? null
-              : () {
-                  showImageZoomViewerFromSource(
-                    context,
-                    source: widget.src,
-                  );
-                },
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  border: showHandles
-                      ? Border.all(color: colors.primary, width: 1.5)
-                      : null,
-                ),
-                child: image,
-              ),
-              if (showHandles)
-                Positioned(
-                  right: -_handleExtent / 2,
-                  top: 0,
-                  bottom: 0,
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.resizeLeftRight,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragStart: (_) {
-                        setState(() => _dragWidth = displayWidth);
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        final next =
-                            ((_dragWidth ?? displayWidth) + details.delta.dx)
-                                .clamp(_minWidth, _maxWidth(context));
-                        setState(() => _dragWidth = next);
-                      },
-                      onHorizontalDragEnd: (_) {
-                        final w = (_dragWidth ?? displayWidth).round();
-                        setState(() => _dragWidth = null);
-                        widget.onWidthChanged(widget.src, w);
-                      },
-                      onHorizontalDragCancel: () {
-                        setState(() => _dragWidth = null);
-                      },
-                      child: SizedBox(
-                        width: _handleExtent,
-                        child: Center(
-                          child: Container(
-                            width: 4,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: colors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
+    final zoomable = GestureDetector(
+      onTap: widget.readOnly ? null : _selectImage,
+      // 双击：打开单图放大（无前后切换）
+      onDoubleTap: provider == null
+          ? null
+          : () {
+              showImageZoomViewerFromSource(
+                context,
+                source: widget.src,
+              );
+            },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              border: showHandles
+                  ? Border.all(color: colors.primary, width: 1.5)
+                  : null,
+            ),
+            child: image,
+          ),
+          if (showHandles)
+            Positioned(
+              right: -_handleExtent / 2,
+              top: 0,
+              bottom: 0,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeLeftRight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragStart: (_) {
+                    setState(() => _dragWidth = displayWidth);
+                  },
+                  onHorizontalDragUpdate: (details) {
+                    final next =
+                        ((_dragWidth ?? displayWidth) + details.delta.dx)
+                            .clamp(_minWidth, _maxWidth(context));
+                    setState(() => _dragWidth = next);
+                  },
+                  onHorizontalDragEnd: (_) {
+                    final w = (_dragWidth ?? displayWidth).round();
+                    setState(() => _dragWidth = null);
+                    widget.onWidthChanged(widget.src, w);
+                  },
+                  onHorizontalDragCancel: () {
+                    setState(() => _dragWidth = null);
+                  },
+                  child: SizedBox(
+                    width: _handleExtent,
+                    child: Center(
+                      child: Container(
+                        width: 4,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: provider == null
+            ? zoomable
+            : Tooltip(
+                message: context.l10n.doubleClickToZoomImage,
+                waitDuration: const Duration(milliseconds: 400),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: zoomable,
+                ),
+              ),
       ),
     );
   }

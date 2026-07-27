@@ -229,30 +229,37 @@ class _QrCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          // 双击二维码：打开单图放大查看
-          GestureDetector(
-            onDoubleTap: () {
-              showImageZoomViewerFromAsset(
-                context,
-                assetPath: assetPath,
-                title: title,
-              );
-            },
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.asset(
-                assetPath,
-                width: qrSize,
-                height: qrSize,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => SizedBox(
-                  width: qrSize,
-                  height: qrSize,
-                  child: Center(
-                    child: Text(
-                      context.l10n.qrLoadFailed,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, color: colors.error),
+          // 悬停提示 + 双击放大
+          Tooltip(
+            message: context.l10n.doubleClickToZoomImage,
+            waitDuration: const Duration(milliseconds: 400),
+            child: GestureDetector(
+              onDoubleTap: () {
+                showImageZoomViewerFromAsset(
+                  context,
+                  assetPath: assetPath,
+                  title: title,
+                );
+              },
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Image.asset(
+                    assetPath,
+                    width: qrSize,
+                    height: qrSize,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => SizedBox(
+                      width: qrSize,
+                      height: qrSize,
+                      child: Center(
+                        child: Text(
+                          context.l10n.qrLoadFailed,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 11, color: colors.error),
+                        ),
+                      ),
                     ),
                   ),
                 ),

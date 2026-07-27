@@ -148,6 +148,8 @@ class AppLocalizations {
   String get zoomIn => _t('放大', 'Zoom in');
   String get zoomOut => _t('缩小', 'Zoom out');
   String get zoomReset => _t('重置缩放', 'Reset zoom');
+  String get doubleClickToZoomImage =>
+      _t('双击放大该图片', 'Double-click to enlarge this image');
   String get imageZoomHint => _t(
         '双指/滚轮缩放，拖动平移；双击重置',
         'Pinch or scroll to zoom, drag to pan; double-tap to reset',
