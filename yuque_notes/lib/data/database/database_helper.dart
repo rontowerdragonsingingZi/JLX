@@ -12,6 +12,9 @@ class DatabaseHelper {
   static const String foldersTable = 'folders';
   static const String documentsTable = 'documents';
 
+  /// v4: folders/documents 增加 sort_order，支持拖拽排序。
+  static const int schemaVersion = 4;
+
   Future<Database> get database async {
     final existing = _database;
     if (existing != null) {
@@ -39,7 +42,7 @@ class DatabaseHelper {
     }
     return openDatabase(
       path,
-      version: 3,
+      version: schemaVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -64,6 +67,7 @@ class DatabaseHelper {
         name TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES $usersTable(id),
         FOREIGN KEY (parent_id) REFERENCES $foldersTable(id)
       )
@@ -79,6 +83,7 @@ class DatabaseHelper {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         synced_to_community INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (user_id) REFERENCES $usersTable(id),
         FOREIGN KEY (folder_id) REFERENCES $foldersTable(id)
       )
@@ -96,13 +101,28 @@ class DatabaseHelper {
         'ALTER TABLE $documentsTable ADD COLUMN synced_to_community INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE $foldersTable ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE $documentsTable ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0',
+      );
+      // 用 id 回填，保持大致创建顺序
+      await db.execute(
+        'UPDATE $foldersTable SET sort_order = id',
+      );
+      await db.execute(
+        'UPDATE $documentsTable SET sort_order = id',
+      );
+    }
   }
 
   Future<void> useInMemoryDatabase() async {
     await close();
     _database = await openDatabase(
       inMemoryDatabasePath,
-      version: 3,
+      version: schemaVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );

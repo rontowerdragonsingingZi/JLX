@@ -54,10 +54,10 @@ class DocumentEditorPanel extends StatefulWidget {
   final bool showTitleBar;
 
   @override
-  State<DocumentEditorPanel> createState() => _DocumentEditorPanelState();
+  State<DocumentEditorPanel> createState() => DocumentEditorPanelState();
 }
 
-class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
+class DocumentEditorPanelState extends State<DocumentEditorPanel> {
   late QuillController _controller;
   late FocusNode _focusNode;
   late ScrollController _scrollController;
@@ -129,15 +129,20 @@ class _DocumentEditorPanelState extends State<DocumentEditorPanel> {
     }
   }
 
+  /// 静默保存当前编辑内容（拖拽移动文档前自动落盘，不弹 SnackBar）。
+  Future<void> saveSilently() async {
+    final markdown = deltaToMarkdown(
+      _controller.document,
+      imageWidths: _imageWidths,
+    );
+    await widget.onSave(markdown);
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
       FocusManager.instance.primaryFocus?.unfocus();
-      final markdown = deltaToMarkdown(
-        _controller.document,
-        imageWidths: _imageWidths,
-      );
-      await widget.onSave(markdown);
+      await saveSilently();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(context.l10n.saved)),

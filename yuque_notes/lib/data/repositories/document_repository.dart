@@ -31,6 +31,10 @@ class DocumentRepository {
     }
 
     final now = DateTime.now();
+    final sortOrder = await _nextDocumentSortOrder(
+      userId: userId,
+      folderId: folderId,
+    );
     final id = await db.insert(
       DatabaseHelper.documentsTable,
       {
@@ -41,6 +45,7 @@ class DocumentRepository {
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
         'synced_to_community': 0,
+        'sort_order': sortOrder,
       },
     );
 
@@ -53,7 +58,25 @@ class DocumentRepository {
       createdAt: now,
       updatedAt: now,
       syncedToCommunity: false,
+      sortOrder: sortOrder,
     );
+  }
+
+  Future<int> _nextDocumentSortOrder({
+    required int userId,
+    required int folderId,
+  }) async {
+    final docs = await getDocumentsInFolder(userId: userId, folderId: folderId);
+    if (docs.isEmpty) {
+      return 0;
+    }
+    var maxOrder = docs.first.sortOrder;
+    for (final d in docs) {
+      if (d.sortOrder > maxOrder) {
+        maxOrder = d.sortOrder;
+      }
+    }
+    return maxOrder + 1;
   }
 
   Future<void> markSyncedToCommunity({
@@ -100,7 +123,7 @@ class DocumentRepository {
       DatabaseHelper.documentsTable,
       where: 'user_id = ? AND folder_id = ?',
       whereArgs: [userId, folderId],
-      orderBy: 'title ASC',
+      orderBy: 'sort_order ASC, title ASC',
     );
     return rows.map(Document.fromMap).toList();
   }
@@ -132,6 +155,89 @@ class DocumentRepository {
       content: content,
       updatedAt: now,
       syncedToCommunity: false,
+    );
+  }
+
+  /// 将 [documentId] 放到 [targetFolderId] 中；
+  /// [beforeDocumentId] 为 null 表示夹内末尾，否则插到该文档之前。
+  Future<Document> reorderDocument({
+    required int userId,
+    required int documentId,
+    required int targetFolderId,
+    int? beforeDocumentId,
+  }) async {
+    final document = await getDocument(userId: userId, documentId: documentId);
+    if (document == null) {
+      throw RepositoryException('Document not found');
+    }
+
+    final db = await _databaseHelper.database;
+    final folderRows = await db.query(
+      DatabaseHelper.foldersTable,
+      where: 'id = ? AND user_id = ?',
+      whereArgs: [targetFolderId, userId],
+      limit: 1,
+    );
+    if (folderRows.isEmpty) {
+      throw RepositoryException('Folder not found');
+    }
+
+    if (beforeDocumentId != null && beforeDocumentId == documentId) {
+      return document;
+    }
+
+    // 先移到目标夹（若需要），再统一重写 sort_order
+    if (document.folderId != targetFolderId) {
+      await db.update(
+        DatabaseHelper.documentsTable,
+        {
+          'folder_id': targetFolderId,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [documentId, userId],
+      );
+    }
+
+    final siblings = await getDocumentsInFolder(
+      userId: userId,
+      folderId: targetFolderId,
+    );
+    final ordered = siblings.where((d) => d.id != documentId).toList();
+    var insertAt = ordered.length;
+    if (beforeDocumentId != null) {
+      final idx = ordered.indexWhere((d) => d.id == beforeDocumentId);
+      if (idx >= 0) {
+        insertAt = idx;
+      }
+    }
+    final moving = document.copyWith(folderId: targetFolderId);
+    ordered.insert(insertAt, moving);
+
+    final now = DateTime.now().toIso8601String();
+    for (var i = 0; i < ordered.length; i++) {
+      await db.update(
+        DatabaseHelper.documentsTable,
+        {'sort_order': i, 'updated_at': now},
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [ordered[i].id, userId],
+      );
+    }
+
+    return moving.copyWith(sortOrder: insertAt, updatedAt: DateTime.now());
+  }
+
+  /// 兼容旧调用：移到目标夹末尾。
+  Future<Document> moveDocument({
+    required int userId,
+    required int documentId,
+    required int targetFolderId,
+  }) {
+    return reorderDocument(
+      userId: userId,
+      documentId: documentId,
+      targetFolderId: targetFolderId,
+      beforeDocumentId: null,
     );
   }
 

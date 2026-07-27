@@ -71,6 +71,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       widget._communitySyncService ?? CommunitySyncService();
   final _sessionService = SessionService();
   final _notebookTransferService = NotebookTransferService();
+  final GlobalKey<DocumentEditorPanelState> _editorPanelKey =
+      GlobalKey<DocumentEditorPanelState>();
   bool _transferBusy = false;
 
   List<Folder> _folders = [];
@@ -116,11 +118,14 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
   }
 
-  Future<void> _loadTree() async {
+  /// [silent] 为 true 时不显示整页 loading，避免侧栏销毁导致折叠状态丢失。
+  Future<void> _loadTree({bool silent = false}) async {
     if (!mounted) {
       return;
     }
-    setState(() => _loading = true);
+    if (!silent) {
+      setState(() => _loading = true);
+    }
     try {
       final folders =
           await _folderRepository.getAllFolders(userId: _localUserId);
@@ -139,7 +144,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         _documentsByFolder = docsMap;
       });
     } finally {
-      if (mounted) {
+      if (!silent && mounted) {
         setState(() => _loading = false);
       }
     }
@@ -225,6 +230,66 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       await _loadTree();
     } on RepositoryException catch (e) {
       _showError(e.message);
+    }
+  }
+
+  Future<void> _autoSaveIfOpen(int documentId) async {
+    if (_selectedDocument?.id != documentId) {
+      return;
+    }
+    final editorState = _editorPanelKey.currentState;
+    if (editorState != null) {
+      await editorState.saveSilently();
+    }
+  }
+
+  /// 拖拽重排/移动文档：无感刷新（不 toast、不整页 loading）。
+  Future<void> _reorderDocument({
+    required int documentId,
+    required int targetFolderId,
+    int? beforeDocumentId,
+  }) async {
+    try {
+      await _autoSaveIfOpen(documentId);
+      final doc = await _documentRepository.reorderDocument(
+        userId: _localUserId,
+        documentId: documentId,
+        targetFolderId: targetFolderId,
+        beforeDocumentId: beforeDocumentId,
+      );
+      await _loadTree(silent: true);
+      if (!mounted) {
+        return;
+      }
+      if (_selectedDocument?.id == documentId) {
+        setState(() {
+          _selectedDocument = doc;
+          _selectedFolderId = targetFolderId;
+        });
+      }
+    } on RepositoryException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      _showError(e.toString());
+    }
+  }
+
+  /// 同级文件夹插位重排：无感刷新。
+  Future<void> _reorderFolder({
+    required int folderId,
+    int? beforeFolderId,
+  }) async {
+    try {
+      await _folderRepository.reorderFolder(
+        userId: _localUserId,
+        folderId: folderId,
+        beforeFolderId: beforeFolderId,
+      );
+      await _loadTree(silent: true);
+    } on RepositoryException catch (e) {
+      _showError(e.message);
+    } catch (e) {
+      _showError(e.toString());
     }
   }
 
@@ -863,6 +928,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       onCreateDocument: _createDocument,
                       onRename: _rename,
                       onDelete: _delete,
+                      onReorderDocument: _reorderDocument,
+                      onReorderFolder: _reorderFolder,
                       onExport: _exportNotebook,
                       onImport: _importNotebook,
                       transferBusy: _transferBusy,
@@ -984,7 +1051,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       return const _WelcomePanel();
     }
     return DocumentEditorPanel(
-      key: ValueKey(_selectedDocument!.id),
+      // 稳定 GlobalKey：拖拽移动前可调用 saveSilently
+      key: _editorPanelKey,
       document: _selectedDocument!,
       // 始终展示「上传云端」；未登录时由 onSyncToCommunity 内拉起登录。
       canSyncToCommunity: true,

@@ -12,6 +12,43 @@ typedef DocumentAction = Future<void> Function(int folderId);
 typedef ItemSelect = void Function({int? folderId, int? documentId});
 typedef RenameAction = Future<void> Function({int? folderId, int? documentId, required String name});
 typedef DeleteAction = Future<void> Function({int? folderId, int? documentId});
+/// 文档落到某夹；[beforeDocumentId] 为 null 表示夹内末尾，否则插到该文档前。
+typedef ReorderDocumentAction = Future<void> Function({
+  required int documentId,
+  required int targetFolderId,
+  int? beforeDocumentId,
+});
+/// 文件夹插到同级 [beforeFolderId] 之前；null 表示末尾。
+typedef ReorderFolderAction = Future<void> Function({
+  required int folderId,
+  int? beforeFolderId,
+});
+
+/// 侧栏文档拖拽载荷。
+class SidebarDocumentDragData {
+  const SidebarDocumentDragData({
+    required this.documentId,
+    required this.sourceFolderId,
+    required this.title,
+  });
+
+  final int documentId;
+  final int sourceFolderId;
+  final String title;
+}
+
+/// 侧栏文件夹拖拽载荷（同级互换顺序）。
+class SidebarFolderDragData {
+  const SidebarFolderDragData({
+    required this.folderId,
+    required this.parentId,
+    required this.name,
+  });
+
+  final int folderId;
+  final int? parentId;
+  final String name;
+}
 
 class SidebarTree extends StatefulWidget {
   const SidebarTree({
@@ -25,6 +62,8 @@ class SidebarTree extends StatefulWidget {
     required this.onCreateDocument,
     required this.onRename,
     required this.onDelete,
+    this.onReorderDocument,
+    this.onReorderFolder,
     this.onExport,
     this.onImport,
     this.transferBusy = false,
@@ -40,6 +79,8 @@ class SidebarTree extends StatefulWidget {
   final DocumentAction onCreateDocument;
   final RenameAction onRename;
   final DeleteAction onDelete;
+  final ReorderDocumentAction? onReorderDocument;
+  final ReorderFolderAction? onReorderFolder;
   final VoidCallback? onExport;
   final VoidCallback? onImport;
   final bool transferBusy;
@@ -52,9 +93,26 @@ class SidebarTree extends StatefulWidget {
 
 class _SidebarTreeState extends State<SidebarTree> {
   final Set<int> _expandedFolderIds = {};
+  /// 拖拽悬停时插入指示：在该 id 上方腾空位。
+  int? _insertBeforeDocumentId;
+  int? _insertBeforeFolderId;
 
   List<Folder> _childrenOf(int? parentId) {
-    return widget.folders.where((f) => f.parentId == parentId).toList();
+    final list = widget.folders.where((f) => f.parentId == parentId).toList();
+    // folders 已按 sort_order 从仓库取出，保持相对顺序
+    return list;
+  }
+
+  Widget _insertionGap(AppThemeColors colors) {
+    return Container(
+      height: 28,
+      margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.45)),
+      ),
+    );
   }
 
   @override
@@ -236,72 +294,59 @@ class _SidebarTreeState extends State<SidebarTree> {
     );
     final indent = condensed ? (depth > 0 ? 8.0 : 0.0) : 0.0;
 
-    final row = Material(
-      color: isSelected ? colors.selected : Colors.transparent,
-      borderRadius: BorderRadius.circular(4),
-      child: InkWell(
+    Widget buildFolderRow({required bool hovering}) {
+      return Material(
+        color: hovering
+            ? colors.primary.withValues(alpha: 0.12)
+            : (isSelected ? colors.selected : Colors.transparent),
         borderRadius: BorderRadius.circular(4),
-        onTap: () {
-          setState(() {
-            if (isExpanded) {
-              _expandedFolderIds.remove(folder.id);
-            } else {
-              _expandedFolderIds.add(folder.id);
-            }
-          });
-          widget.onSelect(folderId: folder.id);
-        },
-        child: Padding(
-          padding: rowPadding,
-          child: Row(
-            children: [
-              if (!condensed)
+        child: InkWell(
+          borderRadius: BorderRadius.circular(4),
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedFolderIds.remove(folder.id);
+              } else {
+                _expandedFolderIds.add(folder.id);
+              }
+            });
+            widget.onSelect(folderId: folder.id);
+          },
+          child: Padding(
+            padding: rowPadding,
+            child: Row(
+              children: [
+                if (!condensed)
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_down
+                        : Icons.keyboard_arrow_right,
+                    size: 18,
+                    color: colors.textSecondary,
+                  ),
                 Icon(
                   isExpanded
-                      ? Icons.keyboard_arrow_down
-                      : Icons.keyboard_arrow_right,
-                  size: 18,
-                  color: colors.textSecondary,
+                      ? Icons.folder_open_outlined
+                      : Icons.folder_outlined,
+                  size: condensed ? 20 : 18,
+                  color: hovering ? colors.primary : colors.textSecondary,
                 ),
-              Icon(
-                isExpanded ? Icons.folder_open_outlined : Icons.folder_outlined,
-                size: condensed ? 20 : 18,
-                color: colors.textSecondary,
-              ),
-              if (!condensed) ...[
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    folder.name,
-                    style: const TextStyle(fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
+                if (!condensed) ...[
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      folder.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: hovering ? colors.primary : colors.textPrimary,
+                        fontWeight:
+                            hovering ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                _buildMenu(
-                  colors: colors,
-                  onRename: () async {
-                    final name = await showNameDialog(
-                      context: context,
-                      title: context.l10n.renameFolder,
-                      hint: context.l10n.folderName,
-                      initialValue: folder.name,
-                    );
-                    if (name != null && name.trim().isNotEmpty) {
-                      await widget.onRename(
-                        folderId: folder.id,
-                        name: name.trim(),
-                      );
-                    }
-                  },
-                  onDelete: () => widget.onDelete(folderId: folder.id),
-                  onAddFolder: () => widget.onCreateFolder(folder.id),
-                  onAddDocument: () => widget.onCreateDocument(folder.id),
-                ),
-              ] else
-                Expanded(
-                  child: _buildMenu(
+                  _buildMenu(
                     colors: colors,
-                    iconSize: 16,
                     onRename: () async {
                       final name = await showNameDialog(
                         context: context,
@@ -320,11 +365,165 @@ class _SidebarTreeState extends State<SidebarTree> {
                     onAddFolder: () => widget.onCreateFolder(folder.id),
                     onAddDocument: () => widget.onCreateDocument(folder.id),
                   ),
+                ] else
+                  Expanded(
+                    child: _buildMenu(
+                      colors: colors,
+                      iconSize: 16,
+                      onRename: () async {
+                        final name = await showNameDialog(
+                          context: context,
+                          title: context.l10n.renameFolder,
+                          hint: context.l10n.folderName,
+                          initialValue: folder.name,
+                        );
+                        if (name != null && name.trim().isNotEmpty) {
+                          await widget.onRename(
+                            folderId: folder.id,
+                            name: name.trim(),
+                          );
+                        }
+                      },
+                      onDelete: () => widget.onDelete(folderId: folder.id),
+                      onAddFolder: () => widget.onCreateFolder(folder.id),
+                      onAddDocument: () => widget.onCreateDocument(folder.id),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 文件夹：接文档（移入/夹内）与同级文件夹（插到自己前面）；悬停自动展开
+    final folderDropTarget = DragTarget<Object>(
+      onWillAcceptWithDetails: (details) {
+        final data = details.data;
+        if (data is SidebarDocumentDragData) {
+          return true;
+        }
+        if (data is SidebarFolderDragData) {
+          return data.folderId != folder.id && data.parentId == folder.parentId;
+        }
+        return false;
+      },
+      onMove: (details) {
+        final data = details.data;
+        // 文档拖到文件夹上：自动展开以便看清内部位置
+        if (data is SidebarDocumentDragData) {
+          if (!_expandedFolderIds.contains(folder.id)) {
+            setState(() => _expandedFolderIds.add(folder.id));
+          }
+          if (_insertBeforeFolderId != null ||
+              _insertBeforeDocumentId != null) {
+            setState(() {
+              _insertBeforeFolderId = null;
+              _insertBeforeDocumentId = null;
+            });
+          }
+        } else if (data is SidebarFolderDragData) {
+          if (_insertBeforeFolderId != folder.id) {
+            setState(() {
+              _insertBeforeFolderId = folder.id;
+              _insertBeforeDocumentId = null;
+            });
+          }
+        }
+      },
+      onLeave: (data) {
+        if (_insertBeforeFolderId == folder.id) {
+          setState(() => _insertBeforeFolderId = null);
+        }
+      },
+      onAcceptWithDetails: (details) {
+        final data = details.data;
+        setState(() {
+          _insertBeforeFolderId = null;
+          _insertBeforeDocumentId = null;
+        });
+        if (data is SidebarDocumentDragData) {
+          setState(() => _expandedFolderIds.add(folder.id));
+          // 落到文件夹本体：放入该夹末尾
+          widget.onReorderDocument?.call(
+            documentId: data.documentId,
+            targetFolderId: folder.id,
+            beforeDocumentId: null,
+          );
+        } else if (data is SidebarFolderDragData) {
+          // 插到本夹前面（同级让位）
+          widget.onReorderFolder?.call(
+            folderId: data.folderId,
+            beforeFolderId: folder.id,
+          );
+        }
+      },
+      builder: (context, candidate, rejected) {
+        // 仅在插入位显示绿色空隙，目标文件夹本身不高亮描边
+        final showGap =
+            _insertBeforeFolderId == folder.id && candidate.isNotEmpty;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showGap) _insertionGap(colors),
+            buildFolderRow(hovering: false),
+          ],
+        );
+      },
+    );
+
+    final folderDraggable = LongPressDraggable<SidebarFolderDragData>(
+      data: SidebarFolderDragData(
+        folderId: folder.id,
+        parentId: folder.parentId,
+        name: folder.name,
+      ),
+      delay: const Duration(milliseconds: 280),
+      onDragEnd: (_) {
+        if (_insertBeforeFolderId != null || _insertBeforeDocumentId != null) {
+          setState(() {
+            _insertBeforeFolderId = null;
+            _insertBeforeDocumentId = null;
+          });
+        }
+      },
+      feedback: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(6),
+        color: colors.sidebar,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.folder_outlined, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    folder.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: buildFolderRow(hovering: false),
+      ),
+      child: folderDropTarget,
     );
 
     return Column(
@@ -333,8 +532,12 @@ class _SidebarTreeState extends State<SidebarTree> {
         Padding(
           padding: EdgeInsets.only(left: indent),
           child: condensed
-              ? Tooltip(message: folder.name, waitDuration: const Duration(milliseconds: 400), child: row)
-              : row,
+              ? Tooltip(
+                  message: folder.name,
+                  waitDuration: const Duration(milliseconds: 400),
+                  child: folderDraggable,
+                )
+              : folderDraggable,
         ),
         if (isExpanded) ...[
           ...children.map(
@@ -366,59 +569,47 @@ class _SidebarTreeState extends State<SidebarTree> {
   ) {
     final condensed = widget.condensed;
     final isSelected = widget.selectedDocumentId == document.id;
-    final row = Material(
-      color: isSelected ? colors.selected : Colors.transparent,
-      borderRadius: BorderRadius.circular(4),
-      child: InkWell(
+
+    Widget buildDocRow({required bool hovering}) {
+      return Material(
+        color: hovering
+            ? colors.primary.withValues(alpha: 0.12)
+            : (isSelected ? colors.selected : Colors.transparent),
         borderRadius: BorderRadius.circular(4),
-        onTap: () => widget.onSelect(
-          folderId: document.folderId,
-          documentId: document.id,
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: condensed ? 2 : 4,
-            vertical: compact ? 10 : (condensed ? 6 : 4),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(4),
+          onTap: () => widget.onSelect(
+            folderId: document.folderId,
+            documentId: document.id,
           ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.description_outlined,
-                size: condensed ? 20 : 18,
-                color: colors.textSecondary,
-              ),
-              if (!condensed) ...[
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    document.title,
-                    style: const TextStyle(fontSize: 14),
-                    overflow: TextOverflow.ellipsis,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: condensed ? 2 : 4,
+              vertical: compact ? 10 : (condensed ? 6 : 4),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.description_outlined,
+                  size: condensed ? 20 : 18,
+                  color: hovering ? colors.primary : colors.textSecondary,
+                ),
+                if (!condensed) ...[
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      document.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: hovering ? colors.primary : null,
+                        fontWeight:
+                            hovering ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                _buildMenu(
-                  colors: colors,
-                  onRename: () async {
-                    final name = await showNameDialog(
-                      context: context,
-                      title: context.l10n.renameDocument,
-                      hint: context.l10n.documentTitle,
-                      initialValue: document.title,
-                    );
-                    if (name != null && name.trim().isNotEmpty) {
-                      await widget.onRename(
-                        documentId: document.id,
-                        name: name.trim(),
-                      );
-                    }
-                  },
-                  onDelete: () => widget.onDelete(documentId: document.id),
-                ),
-              ] else
-                Expanded(
-                  child: _buildMenu(
+                  _buildMenu(
                     colors: colors,
-                    iconSize: 16,
                     onRename: () async {
                       final name = await showNameDialog(
                         context: context,
@@ -435,21 +626,141 @@ class _SidebarTreeState extends State<SidebarTree> {
                     },
                     onDelete: () => widget.onDelete(documentId: document.id),
                   ),
+                ] else
+                  Expanded(
+                    child: _buildMenu(
+                      colors: colors,
+                      iconSize: 16,
+                      onRename: () async {
+                        final name = await showNameDialog(
+                          context: context,
+                          title: context.l10n.renameDocument,
+                          hint: context.l10n.documentTitle,
+                          initialValue: document.title,
+                        );
+                        if (name != null && name.trim().isNotEmpty) {
+                          await widget.onRename(
+                            documentId: document.id,
+                            name: name.trim(),
+                          );
+                        }
+                      },
+                      onDelete: () => widget.onDelete(documentId: document.id),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 文档：接收其他文档，插到自己前面（同夹让位；跨夹则移动到本夹并插到前面）
+    final docDropTarget = DragTarget<SidebarDocumentDragData>(
+      onWillAcceptWithDetails: (details) {
+        return details.data.documentId != document.id;
+      },
+      onMove: (details) {
+        if (_insertBeforeDocumentId != document.id) {
+          setState(() {
+            _insertBeforeDocumentId = document.id;
+            _insertBeforeFolderId = null;
+          });
+        }
+      },
+      onLeave: (data) {
+        if (_insertBeforeDocumentId == document.id) {
+          setState(() => _insertBeforeDocumentId = null);
+        }
+      },
+      onAcceptWithDetails: (details) {
+        setState(() {
+          _insertBeforeDocumentId = null;
+          _insertBeforeFolderId = null;
+        });
+        widget.onReorderDocument?.call(
+          documentId: details.data.documentId,
+          targetFolderId: document.folderId,
+          beforeDocumentId: document.id,
+        );
+      },
+      builder: (context, candidate, rejected) {
+        // 仅在插入位显示绿色空隙，下一文档本身不高亮描边
+        final showGap =
+            _insertBeforeDocumentId == document.id && candidate.isNotEmpty;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showGap) _insertionGap(colors),
+            buildDocRow(hovering: false),
+          ],
+        );
+      },
+    );
+
+    // 长按拖动：夹内插位 / 跨夹移动
+    final draggable = LongPressDraggable<SidebarDocumentDragData>(
+      data: SidebarDocumentDragData(
+        documentId: document.id,
+        sourceFolderId: document.folderId,
+        title: document.title,
+      ),
+      delay: const Duration(milliseconds: 280),
+      onDragEnd: (_) {
+        if (_insertBeforeFolderId != null || _insertBeforeDocumentId != null) {
+          setState(() {
+            _insertBeforeFolderId = null;
+            _insertBeforeDocumentId = null;
+          });
+        }
+      },
+      feedback: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(6),
+        color: colors.sidebar,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 200),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.description_outlined, size: 18, color: colors.primary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    document.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
+      childWhenDragging: Opacity(
+        opacity: 0.35,
+        child: buildDocRow(hovering: false),
+      ),
+      child: docDropTarget,
     );
 
     if (condensed) {
       return Tooltip(
         message: document.title,
         waitDuration: const Duration(milliseconds: 400),
-        child: row,
+        child: draggable,
       );
     }
-    return row;
+    return draggable;
   }
 
   Widget _buildMenu({

@@ -97,6 +97,9 @@ class AppLocalizations {
   String get selectOrCreateDoc =>
       _t('选择或创建一个文档开始记录',
           'Select or create a document to start writing');
+  String get documentMoved =>
+      _t('已移动到目标文件夹', 'Moved to target folder');
+  String get orderUpdated => _t('顺序已更新', 'Order updated');
   String get export => _t('导出', 'Export');
   String get import => _t('导入', 'Import');
   String get contactUs => _t('联系我们', 'Contact us');

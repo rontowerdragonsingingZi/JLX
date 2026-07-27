@@ -61,6 +61,10 @@ class FolderRepository {
     }
 
     final now = DateTime.now();
+    final sortOrder = await _nextFolderSortOrder(
+      userId: userId,
+      parentId: parentId,
+    );
     final id = await db.insert(
       DatabaseHelper.foldersTable,
       {
@@ -69,6 +73,7 @@ class FolderRepository {
         'name': trimmed,
         'created_at': now.toIso8601String(),
         'updated_at': now.toIso8601String(),
+        'sort_order': sortOrder,
       },
     );
 
@@ -79,6 +84,89 @@ class FolderRepository {
       name: trimmed,
       createdAt: now,
       updatedAt: now,
+      sortOrder: sortOrder,
+    );
+  }
+
+  Future<int> _nextFolderSortOrder({
+    required int userId,
+    int? parentId,
+  }) async {
+    final siblings = await getChildFolders(userId: userId, parentId: parentId);
+    if (siblings.isEmpty) {
+      return 0;
+    }
+    var maxOrder = siblings.first.sortOrder;
+    for (final s in siblings) {
+      if (s.sortOrder > maxOrder) {
+        maxOrder = s.sortOrder;
+      }
+    }
+    return maxOrder + 1;
+  }
+
+  /// 同级文件夹重排：将 [folderId] 插到 [beforeFolderId] 之前；
+  /// [beforeFolderId] 为 null 时放到同级末尾。
+  Future<void> reorderFolder({
+    required int userId,
+    required int folderId,
+    int? beforeFolderId,
+  }) async {
+    if (beforeFolderId != null && beforeFolderId == folderId) {
+      return;
+    }
+    final moving = await getFolder(userId: userId, folderId: folderId);
+    if (moving == null) {
+      throw RepositoryException('文件夹不存在 / Folder not found');
+    }
+
+    int? parentId = moving.parentId;
+    if (beforeFolderId != null) {
+      final before = await getFolder(userId: userId, folderId: beforeFolderId);
+      if (before == null) {
+        throw RepositoryException('文件夹不存在 / Folder not found');
+      }
+      if (before.parentId != moving.parentId) {
+        throw RepositoryException(
+          '只能与同级文件夹调整顺序 / Can only reorder folders at the same level',
+        );
+      }
+      parentId = before.parentId;
+    }
+
+    final siblings = await getChildFolders(userId: userId, parentId: parentId);
+    final ordered = siblings.where((f) => f.id != folderId).toList();
+    var insertAt = ordered.length;
+    if (beforeFolderId != null) {
+      final idx = ordered.indexWhere((f) => f.id == beforeFolderId);
+      if (idx >= 0) {
+        insertAt = idx;
+      }
+    }
+    ordered.insert(insertAt, moving);
+
+    final db = await _databaseHelper.database;
+    final now = DateTime.now().toIso8601String();
+    for (var i = 0; i < ordered.length; i++) {
+      await db.update(
+        DatabaseHelper.foldersTable,
+        {'sort_order': i, 'updated_at': now},
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [ordered[i].id, userId],
+      );
+    }
+  }
+
+  /// 兼容旧调用：两夹互换。
+  Future<void> swapFolderOrder({
+    required int userId,
+    required int folderIdA,
+    required int folderIdB,
+  }) {
+    return reorderFolder(
+      userId: userId,
+      folderId: folderIdA,
+      beforeFolderId: folderIdB,
     );
   }
 
@@ -134,7 +222,7 @@ class FolderRepository {
           ? 'user_id = ? AND parent_id IS NULL'
           : 'user_id = ? AND parent_id = ?',
       whereArgs: parentId == null ? [userId] : [userId, parentId],
-      orderBy: 'name ASC',
+      orderBy: 'sort_order ASC, name ASC',
     );
     return rows.map(Folder.fromMap).toList();
   }
@@ -145,7 +233,7 @@ class FolderRepository {
       DatabaseHelper.foldersTable,
       where: 'user_id = ?',
       whereArgs: [userId],
-      orderBy: 'name ASC',
+      orderBy: 'sort_order ASC, name ASC',
     );
     return rows.map(Folder.fromMap).toList();
   }
