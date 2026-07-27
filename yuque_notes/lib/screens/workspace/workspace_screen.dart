@@ -22,6 +22,7 @@ import '../../widgets/app_feedback_dialog.dart';
 import '../../widgets/app_logo.dart';
 import '../../widgets/contact_us_dialog.dart';
 import '../../widgets/document_editor_panel.dart';
+import '../../widgets/export_selection_dialog.dart';
 import '../../widgets/name_dialog.dart';
 import '../../widgets/sidebar_tree.dart';
 import '../../widgets/user_avatar.dart';
@@ -316,10 +317,30 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     if (_transferBusy) {
       return;
     }
+
+    // 先弹出选择框：勾选文件夹/文档（夹=带结构，仅文件=扁平）
+    final selection = await showExportSelectionDialog(
+      context: context,
+      folders: _folders,
+      documentsByFolder: _documentsByFolder,
+    );
+    if (selection == null || !mounted) {
+      return;
+    }
+    if (selection.selectedFolderIds.isEmpty &&
+        selection.selectedDocumentIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.exportNothingSelected)),
+      );
+      return;
+    }
+
     setState(() => _transferBusy = true);
     try {
       final path = await _notebookTransferService.exportNotebook(
         userId: _localUserId,
+        selectedFolderIds: selection.selectedFolderIds,
+        selectedDocumentIds: selection.selectedDocumentIds,
       );
       if (!mounted || path == null) {
         return;
@@ -346,6 +367,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     try {
       final result = await _notebookTransferService.importNotebook(
         userId: _localUserId,
+        // 无目录结构的包：导入到当前选中的主目录文件夹
+        targetFolderId: _selectedFolderId,
       );
       if (!mounted || result == null) {
         return;

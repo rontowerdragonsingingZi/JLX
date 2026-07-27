@@ -102,6 +102,17 @@ class AppLocalizations {
   String get contactUs => _t('联系我们', 'Contact us');
   String get exportFailed => _t('导出失败', 'Export failed');
   String get importFailed => _t('导入失败', 'Import failed');
+  String get exportSelectTitle => _t('选择导出内容', 'Select items to export');
+  String get exportSelectHint => _t(
+        '勾选文件夹将导出其目录结构；仅勾选文档则只导出文件。支持多选组合。',
+        'Checking a folder exports its structure; checking only files exports files alone. Multi-select supported.',
+      );
+  String get exportNothingSelected =>
+      _t('请至少选择一个文件夹或文档', 'Select at least one folder or document');
+  String get importSelectTargetFolder => _t(
+        '无目录结构的导出包需先选择主目录文件夹',
+        'Select a main folder first for packages without folder structure',
+      );
   String exportedTo(String path) => _t('已导出：$path', 'Exported: $path');
   String importDone(int folders, int docs) => _t(
         '导入完成：新建文件夹 $folders 个，文档 $docs 篇',
