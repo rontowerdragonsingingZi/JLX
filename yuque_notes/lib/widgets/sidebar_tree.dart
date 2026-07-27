@@ -25,6 +25,9 @@ class SidebarTree extends StatefulWidget {
     required this.onCreateDocument,
     required this.onRename,
     required this.onDelete,
+    this.onExport,
+    this.onImport,
+    this.transferBusy = false,
     this.condensed = false,
   });
 
@@ -37,6 +40,9 @@ class SidebarTree extends StatefulWidget {
   final DocumentAction onCreateDocument;
   final RenameAction onRename;
   final DeleteAction onDelete;
+  final VoidCallback? onExport;
+  final VoidCallback? onImport;
+  final bool transferBusy;
   /// 左侧栏缩窄时：仅显示图标，文字进 Tooltip。
   final bool condensed;
 
@@ -58,6 +64,62 @@ class _SidebarTreeState extends State<SidebarTree> {
     final compact = isCompactLayout(context);
     final condensed = widget.condensed;
     final roots = _childrenOf(null);
+    final transferBusy = widget.transferBusy;
+    // 仅图标、无边框、紧凑点击区；导入导出合计约占行宽 1/4。
+    Widget transferIconButton({
+      required Key key,
+      required String tooltip,
+      required IconData icon,
+      required VoidCallback? onPressed,
+      bool showBusy = false,
+    }) {
+      return Tooltip(
+        message: tooltip,
+        child: IconButton(
+          key: key,
+          onPressed: transferBusy ? null : onPressed,
+          tooltip: tooltip,
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          iconSize: 18,
+          icon: showBusy && transferBusy
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colors.primary,
+                  ),
+                )
+              : Icon(icon, color: colors.primary),
+        ),
+      );
+    }
+
+    final exportButton = transferIconButton(
+      key: const Key('export_notebook_button'),
+      tooltip: l10n.export,
+      icon: Icons.file_upload_outlined,
+      onPressed: widget.onExport,
+      showBusy: true,
+    );
+    final importButton = transferIconButton(
+      key: const Key('import_notebook_button'),
+      tooltip: l10n.import,
+      icon: Icons.file_download_outlined,
+      onPressed: widget.onImport,
+    );
+
+    final transferActions = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisSize: MainAxisSize.max,
+      children: [
+        if (widget.onExport != null) Expanded(child: exportButton),
+        if (widget.onImport != null) Expanded(child: importButton),
+      ],
+    );
+
     return Column(
       children: [
         Padding(
@@ -68,29 +130,39 @@ class _SidebarTreeState extends State<SidebarTree> {
             8,
           ),
           child: condensed
-              ? Center(
-                  child: Tooltip(
-                    message: l10n.newFolder,
-                    child: IconButton(
-                      key: const Key('new_folder_icon_button'),
-                      onPressed: () => widget.onCreateFolder(null),
-                      icon: Icon(
-                        Icons.create_new_folder_outlined,
-                        size: 22,
-                        color: colors.primary,
-                      ),
-                      style: IconButton.styleFrom(
-                        side: BorderSide(color: colors.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+              ? Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Tooltip(
+                          message: l10n.newFolder,
+                          child: IconButton(
+                            key: const Key('new_folder_icon_button'),
+                            onPressed: () => widget.onCreateFolder(null),
+                            padding: EdgeInsets.zero,
+                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
+                            icon: Icon(
+                              Icons.create_new_folder_outlined,
+                              size: 20,
+                              color: colors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    Expanded(flex: 1, child: transferActions),
+                  ],
                 )
               : Row(
                   children: [
                     Expanded(
+                      flex: 3,
                       child: OutlinedButton.icon(
                         onPressed: () => widget.onCreateFolder(null),
                         style: buildAppOutlinedButtonStyle(colors),
@@ -101,6 +173,7 @@ class _SidebarTreeState extends State<SidebarTree> {
                         label: Text(l10n.newFolder),
                       ),
                     ),
+                    Expanded(flex: 1, child: transferActions),
                   ],
                 ),
         ),

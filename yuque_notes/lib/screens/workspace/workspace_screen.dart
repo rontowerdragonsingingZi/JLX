@@ -840,6 +840,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                       onCreateDocument: _createDocument,
                       onRename: _rename,
                       onDelete: _delete,
+                      onExport: _exportNotebook,
+                      onImport: _importNotebook,
+                      transferBusy: _transferBusy,
                       condensed: condensed,
                     ),
             ),
@@ -864,78 +867,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Divider(height: 1, color: colors.border),
-            // 导入 / 导出：整库结构（.nnb JSON），Windows / Android 均可用
-            if (condensed)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 6, 4, 2),
-                child: Column(
-                  children: [
-                    Tooltip(
-                      message: l10n.export,
-                      child: IconButton(
-                        key: const Key('export_notebook_button'),
-                        onPressed: _transferBusy ? null : _exportNotebook,
-                        icon: _transferBusy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Icon(
-                                Icons.file_upload_outlined,
-                                size: 20,
-                                color: colors.primary,
-                              ),
-                      ),
-                    ),
-                    Tooltip(
-                      message: l10n.import,
-                      child: IconButton(
-                        key: const Key('import_notebook_button'),
-                        onPressed: _transferBusy ? null : _importNotebook,
-                        icon: Icon(
-                          Icons.file_download_outlined,
-                          size: 20,
-                          color: colors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        key: const Key('export_notebook_button'),
-                        onPressed: _transferBusy ? null : _exportNotebook,
-                        style: buildAppOutlinedButtonStyle(colors),
-                        icon: _transferBusy
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.file_upload_outlined, size: 18),
-                        label: Text(l10n.export),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        key: const Key('import_notebook_button'),
-                        onPressed: _transferBusy ? null : _importNotebook,
-                        style: buildAppOutlinedButtonStyle(colors),
-                        icon: const Icon(Icons.file_download_outlined, size: 18),
-                        label: Text(l10n.import),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             InkWell(
               key: const Key('contact_us_entry'),
               onTap: () => showContactUsDialog(context),
