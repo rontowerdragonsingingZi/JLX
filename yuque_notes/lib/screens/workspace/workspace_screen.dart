@@ -922,7 +922,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
                               l10n.contactUs,
                               style: TextStyle(
                                 fontSize: 14,
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.bold,
                                 color: colors.textPrimary,
                               ),
                             ),

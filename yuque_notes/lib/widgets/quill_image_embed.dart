@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 import '../theme/app_theme.dart';
+import 'image_zoom_viewer.dart';
 
 /// 文档内图片：按保存宽度显示；光标选中后可拖拽右边缘调整宽度。
 class QuillImageEmbedBuilder extends EmbedBuilder {
@@ -167,6 +168,15 @@ class _ResizableQuillImageState extends State<_ResizableQuillImage> {
         alignment: Alignment.centerLeft,
         child: GestureDetector(
           onTap: widget.readOnly ? null : _selectImage,
+          // 双击：打开单图放大（无前后切换）
+          onDoubleTap: provider == null
+              ? null
+              : () {
+                  showImageZoomViewerFromSource(
+                    context,
+                    source: widget.src,
+                  );
+                },
           child: Stack(
             clipBehavior: Clip.none,
             children: [

@@ -142,6 +142,13 @@ class AppLocalizations {
   String get dropImageOnly =>
       _t('请拖入图片文件（jpg / png / gif / webp / bmp）',
           'Drop image files only (jpg / png / gif / webp / bmp)');
+  String get zoomIn => _t('放大', 'Zoom in');
+  String get zoomOut => _t('缩小', 'Zoom out');
+  String get zoomReset => _t('重置缩放', 'Reset zoom');
+  String get imageZoomHint => _t(
+        '双指/滚轮缩放，拖动平移；双击重置',
+        'Pinch or scroll to zoom, drag to pan; double-tap to reset',
+      );
   String get editCopyBlock => _t('编辑可复制块', 'Edit copy block');
   String get smallTitle => _t('小标题', 'Title');
   String get enterSmallTitle => _t('输入小标题', 'Enter a title');

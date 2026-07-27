@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app_branding.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'image_zoom_viewer.dart';
 
 /// 底部「联系我们」入口打开的说明 + 联系方式模态框。
 Future<void> showContactUsDialog(BuildContext context) {
@@ -35,7 +36,8 @@ class ContactUsDialog extends StatelessWidget {
     final l10n = context.l10n;
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
-    final maxWidth = compact ? width - 32.0 : 520.0;
+    // 略加宽，便于默认三码并排
+    final maxWidth = compact ? width - 32.0 : 560.0;
 
     return Dialog(
       insetPadding: EdgeInsets.symmetric(
@@ -75,7 +77,7 @@ class ContactUsDialog extends StatelessWidget {
             Divider(height: 1, color: colors.border),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -107,24 +109,63 @@ class ContactUsDialog extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        const _QrCard(
-                          title: 'QQ',
-                          assetPath: 'assets/images/contact/qq_qr.png',
-                        ),
-                        _QrCard(
-                          title: l10n.wechat,
-                          assetPath: 'assets/images/contact/wechat_qr.png',
-                        ),
-                        const _QrCard(
-                          title: 'Telegram',
-                          assetPath: 'assets/images/contact/tg_qr.png',
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        const gap = 8.0;
+                        const cardPad = 6.0;
+                        final maxContent = constraints.maxWidth;
+                        // 三列并排时单码边长（再缩小，保证默认三开）
+                        final threeWayQr = ((maxContent - gap * 2) / 3 -
+                                cardPad * 2)
+                            .clamp(64.0, 96.0);
+                        final threeWayNeed =
+                            3 * (threeWayQr + cardPad * 2) + gap * 2;
+                        final threeAcross = maxContent + 0.5 >= threeWayNeed;
+
+                        final cards = [
+                          _QrCard(
+                            title: 'QQ',
+                            assetPath: 'assets/images/contact/qq_qr.png',
+                            qrSize: threeAcross ? threeWayQr : 120,
+                            cardPadding: cardPad,
+                          ),
+                          _QrCard(
+                            title: l10n.wechat,
+                            assetPath: 'assets/images/contact/wechat_qr.png',
+                            qrSize: threeAcross ? threeWayQr : 120,
+                            cardPadding: cardPad,
+                          ),
+                          _QrCard(
+                            title: 'Telegram',
+                            assetPath: 'assets/images/contact/tg_qr.png',
+                            qrSize: threeAcross ? threeWayQr : 120,
+                            cardPadding: cardPad,
+                          ),
+                        ];
+
+                        if (threeAcross) {
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (var i = 0; i < cards.length; i++) ...[
+                                if (i > 0) const SizedBox(width: gap),
+                                Expanded(child: cards[i]),
+                              ],
+                            ],
+                          );
+                        }
+
+                        // 窄屏：一个一行，全部居中
+                        return Column(
+                          children: [
+                            for (var i = 0; i < cards.length; i++) ...[
+                              if (i > 0) const SizedBox(height: 12),
+                              Center(child: cards[i]),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     _EmailTile(
@@ -153,22 +194,24 @@ class _QrCard extends StatelessWidget {
   const _QrCard({
     required this.title,
     required this.assetPath,
+    required this.qrSize,
+    this.cardPadding = 6,
   });
 
   final String title;
   final String assetPath;
+  final double qrSize;
+  final double cardPadding;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.appColors;
-    final size = MediaQuery.sizeOf(context).width < 720 ? 120.0 : 140.0;
 
     return Container(
-      width: size + 24,
-      padding: const EdgeInsets.all(10),
+      padding: EdgeInsets.all(cardPadding),
       decoration: BoxDecoration(
         color: colors.sidebar,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: colors.primary.withValues(alpha: 0.35)),
       ),
       child: Column(
@@ -176,27 +219,41 @@ class _QrCard extends StatelessWidget {
         children: [
           Text(
             title,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: colors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: Image.asset(
-              assetPath,
-              width: size,
-              height: size,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => SizedBox(
-                width: size,
-                height: size,
-                child: Center(
-                  child: Text(
-                    context.l10n.qrLoadFailed,
-                    style: TextStyle(fontSize: 12, color: colors.error),
+          const SizedBox(height: 6),
+          // 双击二维码：打开单图放大查看
+          GestureDetector(
+            onDoubleTap: () {
+              showImageZoomViewerFromAsset(
+                context,
+                assetPath: assetPath,
+                title: title,
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.asset(
+                assetPath,
+                width: qrSize,
+                height: qrSize,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => SizedBox(
+                  width: qrSize,
+                  height: qrSize,
+                  child: Center(
+                    child: Text(
+                      context.l10n.qrLoadFailed,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: colors.error),
+                    ),
                   ),
                 ),
               ),
