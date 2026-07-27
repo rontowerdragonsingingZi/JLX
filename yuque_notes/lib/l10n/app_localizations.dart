@@ -39,8 +39,9 @@ class AppLocalizations {
   String get backToLibrary => _t('返回目录', 'Back to library');
 
   // —— Auth ——
-  String get loginForum => _t('登录NN论坛', 'Sign in to NN Forum');
-  String get registerForum => _t('注册NN论坛', 'Register for NN Forum');
+  String get loginForum => _t('登录 NoteYourNeed', 'Sign in to NoteYourNeed');
+  String get registerForum =>
+      _t('注册 NoteYourNeed', 'Register for NoteYourNeed');
   String get username => _t('用户名', 'Username');
   String get password => _t('密码', 'Password');
   String get confirmPassword => _t('确认密码', 'Confirm password');
@@ -222,15 +223,15 @@ class AppLocalizations {
   String get qrLoadFailed => _t('二维码加载失败', 'Failed to load QR');
   String copiedLabel(String label) => _t('已复制$label', 'Copied $label');
   String get contactAbout => _t(
-        'NoteYourNeed（记你需）是一款个人开发的记事软件，如不登录论坛进行同步，则不会进行任何网络链接，保证您信息的安全性。'
+        'NoteYourNeed（记你需）是一款个人开发的记事软件，如不登录 NoteYourNeed 进行同步，则不会进行任何网络链接，保证您信息的安全性。'
             '但我们并不建议您在此存储助记词等极其极其重要的信息。'
             '如果有任何您想要加入的功能与建议，请联系我们，在确保该更新与反馈属实后我们会及时进行更新，欢迎您的使用。'
-            '希望NN能够给您带来实际的生活便利。^_^',
-        'NoteYourNeed is a personal note-taking app. Without signing in to sync, '
+            '希望 NoteYourNeed 能够给您带来实际的生活便利。^_^',
+        'NoteYourNeed is a personal note-taking app. Without signing in to NoteYourNeed to sync, '
             'it makes no network connections, helping keep your data private. '
             'We do not recommend storing extremely sensitive secrets such as seed phrases. '
             'If you have feature ideas or feedback, contact us—we will update when verified. '
-            'Hope NN makes daily life a bit easier. ^_^',
+            'Hope NoteYourNeed makes daily life a bit easier. ^_^',
       );
 
   // —— Errors (common) ——
