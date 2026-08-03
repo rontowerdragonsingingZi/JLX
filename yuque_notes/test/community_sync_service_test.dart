@@ -77,7 +77,7 @@ void main() {
       );
     });
 
-    test('builds sync payload and marks synced_to_community on 201', () async {
+    test('builds sync payload on 201 without requiring sync status flag', () async {
       final folder = await folderRepository.createFolder(
         userId: userId,
         parentId: null,
@@ -152,7 +152,8 @@ void main() {
         userId: userId,
         documentId: document.id,
       );
-      expect(reloaded?.syncedToCommunity, isTrue);
+      expect(reloaded, isNotNull);
+      expect(reloaded?.title, '今日开发日志');
     });
 
     test('allows re-sync after content update', () async {
@@ -207,7 +208,6 @@ void main() {
         userId: userId,
         documentId: document.id,
       );
-      expect(reloaded?.syncedToCommunity, isTrue);
       expect(reloaded?.content, 'v2');
     });
   });

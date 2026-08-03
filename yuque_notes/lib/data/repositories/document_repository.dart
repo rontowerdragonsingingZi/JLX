@@ -79,24 +79,6 @@ class DocumentRepository {
     return maxOrder + 1;
   }
 
-  Future<void> markSyncedToCommunity({
-    required int userId,
-    required int documentId,
-  }) async {
-    final document = await getDocument(userId: userId, documentId: documentId);
-    if (document == null) {
-      throw RepositoryException('Document not found');
-    }
-
-    final db = await _databaseHelper.database;
-    await db.update(
-      DatabaseHelper.documentsTable,
-      {'synced_to_community': 1},
-      where: 'id = ? AND user_id = ?',
-      whereArgs: [documentId, userId],
-    );
-  }
-
   Future<Document?> getDocument({
     required int userId,
     required int documentId,
@@ -124,6 +106,18 @@ class DocumentRepository {
       where: 'user_id = ? AND folder_id = ?',
       whereArgs: [userId, folderId],
       orderBy: 'sort_order ASC, title ASC',
+    );
+    return rows.map(Document.fromMap).toList();
+  }
+
+  /// 当前用户命名空间下的全部文档（登录后全量上云用）。
+  Future<List<Document>> getAllDocuments({required int userId}) async {
+    final db = await _databaseHelper.database;
+    final rows = await db.query(
+      DatabaseHelper.documentsTable,
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'id ASC',
     );
     return rows.map(Document.fromMap).toList();
   }

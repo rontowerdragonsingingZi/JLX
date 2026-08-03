@@ -9,10 +9,12 @@ import '../../data/repositories/document_repository.dart';
 import '../../data/repositories/folder_repository.dart';
 import '../../services/avatar_service.dart';
 import '../../services/cloud_auth_api.dart';
+import '../../services/cloud_image_service.dart';
 import '../../services/community_sync_service.dart';
 import '../../services/local_user_service.dart';
 import '../../services/notebook_transfer_service.dart';
 import '../../services/session_service.dart';
+import '../../services/forum/forum_api_client.dart';
 import '../../app_branding.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/locale_service.dart';
@@ -71,6 +73,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       widget._communitySyncService ?? CommunitySyncService();
   final _sessionService = SessionService();
   final _notebookTransferService = NotebookTransferService();
+  final _cloudImageService = CloudImageService();
   final GlobalKey<DocumentEditorPanelState> _editorPanelKey =
       GlobalKey<DocumentEditorPanelState>();
   bool _transferBusy = false;
@@ -104,6 +107,12 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     } else {
       _loadTree();
     }
+    // 已登录启动：后台全量上云（文档正文 + 文件夹链）
+    if (_isCloudLoggedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncAllToCloudSilently();
+      });
+    }
   }
 
   @override
@@ -115,6 +124,16 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
     if (oldWidget.localUser.id != widget.localUser.id) {
       _loadTree();
+    }
+    // 从未登录 → 登录，或切换到另一云账号：全量上云
+    final wasLoggedIn = oldWidget.cloudUser != null;
+    final isLoggedIn = widget.cloudUser != null;
+    if ((!wasLoggedIn && isLoggedIn) ||
+        (isLoggedIn &&
+            oldWidget.cloudUser?.id != widget.cloudUser?.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncAllToCloudSilently();
+      });
     }
   }
 
@@ -204,6 +223,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         _selectedFolderId = folderId;
         _selectedDocument = doc;
       });
+      // 登录态：新文档（含所在文件夹链）自动上云
+      await _syncDocumentToCloudSilently(documentId: doc.id);
     } on RepositoryException catch (e) {
       _showError(e.message);
     }
@@ -217,6 +238,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           folderId: folderId,
           name: name,
         );
+        await _loadTree();
+        // 文件夹改名会影响链路径，登录态下全量刷新云端结构
+        await _syncAllToCloudSilently();
       } else if (documentId != null) {
         final doc = await _documentRepository.renameDocument(
           userId: _localUserId,
@@ -226,8 +250,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
         if (_selectedDocument?.id == documentId) {
           setState(() => _selectedDocument = doc);
         }
+        await _loadTree();
+        await _syncDocumentToCloudSilently(documentId: documentId);
+      } else {
+        await _loadTree();
       }
-      await _loadTree();
     } on RepositoryException catch (e) {
       _showError(e.message);
     }
@@ -267,6 +294,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           _selectedFolderId = targetFolderId;
         });
       }
+      // 移动/重排改变文件夹归属时同步云端结构
+      await _syncDocumentToCloudSilently(documentId: documentId);
     } on RepositoryException catch (e) {
       _showError(e.message);
     } catch (e) {
@@ -452,6 +481,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
           ),
         ),
       );
+      // 登录态：导入的文档与结构自动上云
+      await _syncAllToCloudSilently();
     } on NotebookTransferException catch (e) {
       await _showErrorDialog(context.l10n.importFailed, e.message);
     } on RepositoryException catch (e) {
@@ -479,6 +510,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       return;
     }
     await widget.onCloudAuthChanged(session.toDisplayUser());
+    // 登录后由 didUpdateWidget 触发全量上云
   }
 
   Future<void> _pickAvatar() async {
@@ -563,105 +595,157 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     }
   }
 
-  Future<bool> _syncDocumentToCommunity() async {
-    if (_selectedDocument == null) {
-      return false;
-    }
-
-    // 未登录：先弹登录；登录成功后继续上传。
+  /// 解析当前可用于上云的会话与本地用户；未登录或游客命名空间返回 null。
+  Future<({CloudSession session, int localUserId})?> _resolveCloudSyncContext() async {
     if (!_isCloudLoggedIn) {
-      await _showAuthDialog();
-      if (!mounted) {
-        return false;
-      }
+      return null;
     }
-
     var session = await _sessionService.getCloudSession();
     if (session == null) {
-      if (mounted) {
-        _showError(context.l10n.pleaseLoginBeforeUpload);
-      }
-      return false;
+      return null;
     }
-
-    // 登录后父组件可能已切换 localUser；以会话 + 当前文档归属为准。
-    // 注意：await 登录后本帧 widget.localUser 可能仍是旧引用，故以 session 与
-    // 文档 userId 判定，不能只看 isLocalGuest(widget.localUser)。
-    final owner = await AuthRepository().getUserById(_selectedDocument!.userId);
-    if (owner == null || AuthRepository.isLocalGuest(owner)) {
-      if (mounted) {
-        _showError(context.l10n.guestCannotUpload);
-      }
-      return false;
+    if (AuthRepository.isLocalGuest(widget.localUser)) {
+      return null;
     }
-
-    // 文档必须属于当前云账号对应的本地用户命名空间。
     final expectedLocal = await LocalUserService().resolveActiveLocalUser(
       cloudSession: session,
     );
-    if (_selectedDocument!.userId != expectedLocal.id) {
-      if (mounted) {
-        _showError(context.l10n.guestCannotUpload);
-      }
-      return false;
+    if (expectedLocal.id != _localUserId) {
+      return null;
     }
+    return (session: session, localUserId: expectedLocal.id);
+  }
 
-    try {
-      await _syncDocumentWithSession(
-        accessToken: session.accessToken,
-        forumUserId: session.userId,
-        localUserId: expectedLocal.id,
+  Future<void> _handleSyncAuthError(CommunitySyncException error) async {
+    if (error.statusCode == 401 && widget._cloudAuthApi != null) {
+      final refreshed = await _sessionService.refreshCloudSession(
+        widget._cloudAuthApi!,
       );
-      return true;
+      if (refreshed != null) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+      await widget.onCloudAuthChanged(null);
+      if (mounted) {
+        _showError(context.l10n.loginExpired);
+      }
+      return;
+    }
+    if (mounted) {
+      _showError(error.message);
+    }
+  }
+
+  /// 单篇上云（登录态自动调用，失败仅提示不阻断本地操作）。
+  Future<void> _syncDocumentToCloudSilently({required int documentId}) async {
+    final ctx = await _resolveCloudSyncContext();
+    if (ctx == null) {
+      return;
+    }
+    try {
+      await _communitySyncService.syncDocumentToCommunity(
+        documentId: documentId,
+        localUserId: ctx.localUserId,
+        forumUserId: ctx.session.userId,
+        accessToken: ctx.session.accessToken,
+      );
+      if (_selectedDocument?.id == documentId) {
+        await _refreshDocument(documentId);
+        final content = _selectedDocument?.content;
+        if (content != null) {
+          _editorPanelKey.currentState?.applyExternalMarkdown(content);
+        }
+      }
     } on CommunitySyncException catch (error) {
       if (error.statusCode == 401 && widget._cloudAuthApi != null) {
         final refreshed = await _sessionService.refreshCloudSession(
           widget._cloudAuthApi!,
         );
-        if (refreshed != null && refreshed.accessToken != session.accessToken) {
+        if (refreshed != null) {
           try {
-            await _syncDocumentWithSession(
-              accessToken: refreshed.accessToken,
+            await _communitySyncService.syncDocumentToCommunity(
+              documentId: documentId,
+              localUserId: ctx.localUserId,
               forumUserId: refreshed.userId,
-              localUserId: expectedLocal.id,
+              accessToken: refreshed.accessToken,
             );
-            return true;
-          } on CommunitySyncException catch (retryError) {
-            if (mounted) {
-              _showError(retryError.message);
+            if (_selectedDocument?.id == documentId) {
+              await _refreshDocument(documentId);
+              final content = _selectedDocument?.content;
+              if (content != null) {
+                _editorPanelKey.currentState?.applyExternalMarkdown(content);
+              }
             }
-            rethrow;
+            return;
+          } on CommunitySyncException catch (retryError) {
+            await _handleSyncAuthError(retryError);
+            return;
           }
         }
-        if (!mounted) {
-          return false;
-        }
-        await widget.onCloudAuthChanged(null);
-        if (!mounted) {
-          return false;
-        }
-        _showError(context.l10n.loginExpired);
-        return false;
       }
-      if (mounted) {
-        _showError(error.message);
-      }
-      rethrow;
+      await _handleSyncAuthError(error);
     }
   }
 
-  Future<void> _syncDocumentWithSession({
-    required String accessToken,
-    required int forumUserId,
-    required int localUserId,
-  }) async {
-    await _communitySyncService.syncDocumentToCommunity(
-      documentId: _selectedDocument!.id,
-      localUserId: localUserId,
-      forumUserId: forumUserId,
-      accessToken: accessToken,
-    );
-    await _refreshDocument(_selectedDocument!.id);
+  /// 登录后全量上云：所有文档 + 各自文件夹链。单篇失败继续其余。
+  Future<void> _syncAllToCloudSilently() async {
+    final ctx = await _resolveCloudSyncContext();
+    if (ctx == null) {
+      return;
+    }
+    final documents =
+        await _documentRepository.getAllDocuments(userId: ctx.localUserId);
+    for (final document in documents) {
+      if (!mounted) {
+        return;
+      }
+      try {
+        await _communitySyncService.syncDocumentToCommunity(
+          documentId: document.id,
+          localUserId: ctx.localUserId,
+          forumUserId: ctx.session.userId,
+          accessToken: ctx.session.accessToken,
+        );
+      } on CommunitySyncException catch (error) {
+        if (error.statusCode == 401 && widget._cloudAuthApi != null) {
+          final refreshed = await _sessionService.refreshCloudSession(
+            widget._cloudAuthApi!,
+          );
+          if (refreshed != null) {
+            try {
+              await _communitySyncService.syncDocumentToCommunity(
+                documentId: document.id,
+                localUserId: ctx.localUserId,
+                forumUserId: refreshed.userId,
+                accessToken: refreshed.accessToken,
+              );
+              continue;
+            } on CommunitySyncException catch (retryError) {
+              await _handleSyncAuthError(retryError);
+              if (retryError.statusCode == 401) {
+                return;
+              }
+              continue;
+            }
+          }
+          await _handleSyncAuthError(error);
+          return;
+        }
+        // 单篇失败不中断整批；仅提示一次
+        if (mounted) {
+          _showError(error.message);
+        }
+      }
+    }
+    if (_selectedDocument != null && mounted) {
+      await _refreshDocument(_selectedDocument!.id);
+      final content = _selectedDocument?.content;
+      if (content != null) {
+        _editorPanelKey.currentState?.applyExternalMarkdown(content);
+      }
+    }
   }
 
   Future<void> _logout() async {
@@ -1034,13 +1118,41 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
     );
   }
 
-  Future<void> _saveSelectedDocument(String markdown) async {
+  /// 保存文档：
+  /// - 未登录：正文可保留 Data URI（仅本机）
+  /// - 已登录：图片 → R2，正文+文件夹链 → posts/sync（自动，无需手动上传）
+  Future<String> _saveSelectedDocument(String markdown) async {
+    var content = markdown;
+    final session = await _sessionService.getCloudSession();
+    if (session != null &&
+        CloudImageService.extractDataImageUris(content).isNotEmpty) {
+      try {
+        content = await _cloudImageService.uploadDataImagesInMarkdown(
+          markdown: content,
+          accessToken: session.accessToken,
+        );
+      } on ForumApiException catch (e) {
+        if (mounted) {
+          _showError(e.message);
+        }
+        // 上传失败则仍按原 Markdown 本地保存，避免丢文
+      }
+    }
+
     await _documentRepository.updateDocumentContent(
       userId: _localUserId,
       documentId: _selectedDocument!.id,
-      content: markdown,
+      content: content,
     );
     await _refreshDocument(_selectedDocument!.id);
+
+    // 登录态：文本库 + 结构自动上云
+    if (session != null) {
+      await _syncDocumentToCloudSilently(documentId: _selectedDocument!.id);
+      // 同步可能再次改写图片 URL
+      content = _selectedDocument?.content ?? content;
+    }
+    return content;
   }
 
   Widget _buildEditorPane({
@@ -1054,10 +1166,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen> {
       // 稳定 GlobalKey：拖拽移动前可调用 saveSilently
       key: _editorPanelKey,
       document: _selectedDocument!,
-      // 始终展示「上传云端」；未登录时由 onSyncToCommunity 内拉起登录。
-      canSyncToCommunity: true,
-      isSyncedToCommunity: _selectedDocument!.syncedToCommunity,
-      onSyncToCommunity: _syncDocumentToCommunity,
       onBack: onBack,
       showTitleBar: showTitleBar,
       onSave: _saveSelectedDocument,

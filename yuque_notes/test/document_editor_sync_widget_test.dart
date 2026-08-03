@@ -25,7 +25,8 @@ Widget _wrapEditor(Widget child) {
 }
 
 void main() {
-  testWidgets('shows sync control when cloud sync is enabled', (tester) async {
+  testWidgets('editor header has save only, no manual cloud upload UI',
+      (tester) async {
     final document = models.Document(
       id: 1,
       userId: 2,
@@ -41,45 +42,17 @@ void main() {
       _wrapEditor(
         DocumentEditorPanel(
           document: document,
-          canSyncToCommunity: true,
-          onSyncToCommunity: () async => true,
-          onSave: (_) async {},
+          onSave: (md) async => md,
         ),
       ),
     );
     await tester.pump();
 
-    expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
-    expect(find.text('上传云端'), findsOneWidget);
-    expect(find.byKey(const Key('synced_to_community_badge')), findsOneWidget);
-    expect(find.text('已上传'), findsOneWidget);
-  });
-
-  testWidgets('shows upload control when callback provided even without badge',
-      (tester) async {
-    final document = models.Document(
-      id: 1,
-      userId: 2,
-      folderId: 3,
-      title: '测试文档',
-      content: 'hello',
-      createdAt: DateTime.parse('2026-01-01T00:00:00'),
-      updatedAt: DateTime.parse('2026-01-01T00:00:00'),
-    );
-
-    await tester.pumpWidget(
-      _wrapEditor(
-        DocumentEditorPanel(
-          document: document,
-          canSyncToCommunity: true,
-          onSyncToCommunity: () async => false,
-          onSave: (_) async {},
-        ),
-      ),
-    );
-    await tester.pump();
-
-    expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
-    expect(find.text('上传云端'), findsOneWidget);
+    expect(find.byKey(const Key('sync_to_community_button')), findsNothing);
+    expect(find.byKey(const Key('synced_to_community_badge')), findsNothing);
+    expect(find.text('上传云端'), findsNothing);
+    expect(find.text('已上传'), findsNothing);
+    expect(find.text('已上传云端'), findsNothing);
+    expect(find.text('保存'), findsOneWidget);
   });
 }

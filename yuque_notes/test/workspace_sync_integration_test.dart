@@ -31,7 +31,7 @@ Widget _wrapWorkspace(Widget child) {
 }
 
 void main() {
-  group('WorkspaceScreen sync integration', () {
+  group('WorkspaceScreen auto cloud sync UI', () {
     late User linkedLocalUser;
     late User cloudUser;
     late models.Document document;
@@ -66,7 +66,7 @@ void main() {
       await tearDownTestDatabase();
     });
 
-    testWidgets('shows sync control for linked local user with cloud session',
+    testWidgets('logged-in editor has no manual upload button or status',
         (tester) async {
       await tester.pumpWidget(
         _wrapWorkspace(
@@ -80,35 +80,17 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
-      expect(find.text('上传云端'), findsOneWidget);
+      expect(find.byKey(const Key('sync_to_community_button')), findsNothing);
+      expect(find.byKey(const Key('synced_to_community_badge')), findsNothing);
+      expect(find.text('上传云端'), findsNothing);
+      expect(find.text('已上传'), findsNothing);
       expect(find.text('今日开发日志'), findsOneWidget);
+      expect(find.text('保存'), findsOneWidget);
     });
-
-    testWidgets('shows synced badge when document already synced', (tester) async {
-      final syncedDocument = document.copyWith(syncedToCommunity: true);
-
-      await tester.pumpWidget(
-        _wrapWorkspace(
-          WorkspaceScreen(
-            localUser: linkedLocalUser,
-            cloudUser: cloudUser,
-            initialSelectedDocument: syncedDocument,
-            onCloudAuthChanged: (_) async {},
-          ),
-        ),
-      );
-      await tester.pump();
-
-      expect(find.byKey(const Key('synced_to_community_badge')), findsOneWidget);
-      expect(find.text('已上传'), findsOneWidget);
-    });
-
   });
 
-  group('WorkspaceScreen guest sync integration', () {
+  group('WorkspaceScreen guest no manual upload UI', () {
     late User guestUser;
-    late User cloudUser;
     late models.Document guestDocument;
 
     setUp(() async {
@@ -127,24 +109,18 @@ void main() {
         folderId: folder.id,
         title: '游客文档',
       );
-      cloudUser = User(
-        id: 42,
-        username: 'alice',
-        createdAt: DateTime.parse('2026-01-01T00:00:00'),
-      );
     });
 
     tearDown(() async {
       await tearDownTestDatabase();
     });
 
-    testWidgets('shows upload control for guest so user can login to upload',
-        (tester) async {
+    testWidgets('guest editor has no upload control', (tester) async {
       await tester.pumpWidget(
         _wrapWorkspace(
           WorkspaceScreen(
             localUser: guestUser,
-            cloudUser: cloudUser,
+            cloudUser: null,
             initialSelectedDocument: guestDocument,
             onCloudAuthChanged: (_) async {},
           ),
@@ -152,8 +128,8 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byKey(const Key('sync_to_community_button')), findsOneWidget);
-      expect(find.text('上传云端'), findsOneWidget);
+      expect(find.byKey(const Key('sync_to_community_button')), findsNothing);
+      expect(find.text('上传云端'), findsNothing);
     });
   });
 }

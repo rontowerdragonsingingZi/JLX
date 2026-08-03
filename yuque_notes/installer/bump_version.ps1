@@ -46,7 +46,8 @@ if (Test-Path $iss) {
     '(?m)^#define MyAppVersion ".*"$',
     "#define MyAppVersion `"$newName`""
   )
-  [System.IO.File]::WriteAllText($iss, $issText, [System.Text.UTF8Encoding]::new($false))
+  # Inno Setup needs UTF-8 BOM for Chinese [Messages] / language files reliability
+  [System.IO.File]::WriteAllText($iss, $issText, [System.Text.UTF8Encoding]::new($true))
 }
 
 Write-Output $newFull

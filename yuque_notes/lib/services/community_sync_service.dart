@@ -1,6 +1,7 @@
 import '../data/repositories/auth_repository.dart';
 import '../data/repositories/document_repository.dart';
 import '../data/repositories/folder_repository.dart';
+import 'cloud_image_service.dart';
 import 'forum/forum_api_client.dart';
 
 class CommunitySyncException implements Exception {
@@ -19,15 +20,18 @@ class CommunitySyncService {
     DocumentRepository? documentRepository,
     FolderRepository? folderRepository,
     AuthRepository? authRepository,
+    CloudImageService? cloudImageService,
   })  : _forumClient = forumClient ?? ForumApiClient(),
         _documentRepository = documentRepository ?? DocumentRepository(),
         _folderRepository = folderRepository ?? FolderRepository(),
-        _authRepository = authRepository ?? AuthRepository();
+        _authRepository = authRepository ?? AuthRepository(),
+        _cloudImageService = cloudImageService ?? CloudImageService();
 
   final ForumApiClient _forumClient;
   final DocumentRepository _documentRepository;
   final FolderRepository _folderRepository;
   final AuthRepository _authRepository;
+  final CloudImageService _cloudImageService;
 
   /// 生成跨用户唯一的云端文档键，避免各端本地 `documents.id` 从 1 自增互相抢帖。
   /// 仍落在 JSON 安全整数范围内（< 2^53）。
@@ -100,6 +104,27 @@ class CommunitySyncService {
       localDocumentId: document.id,
     );
 
+    // 同步前把仍残留的 Data URI 图片上传到 R2（notes/{userId}/…）
+    var content = document.content;
+    try {
+      content = await _cloudImageService.uploadDataImagesInMarkdown(
+        markdown: content,
+        accessToken: accessToken,
+      );
+      if (content != document.content) {
+        await _documentRepository.updateDocumentContent(
+          userId: document.userId,
+          documentId: document.id,
+          content: content,
+        );
+      }
+    } on ForumApiException catch (error) {
+      throw CommunitySyncException(
+        error.message,
+        statusCode: error.statusCode,
+      );
+    }
+
     try {
       await _forumClient.postJson(
         '/api/posts/sync',
@@ -122,7 +147,7 @@ class CommunitySyncService {
                 },
             ],
           'title': document.title,
-          'content': document.content,
+          'content': content,
           'bssDocumentUpdatedAt': document.updatedAt.toIso8601String(),
         },
       );
@@ -132,11 +157,25 @@ class CommunitySyncService {
         statusCode: error.statusCode,
       );
     }
+  }
 
-    await _documentRepository.markSyncedToCommunity(
-      userId: document.userId,
-      documentId: document.id,
-    );
+  /// 登录后：当前本地用户下全部文档上云（正文 + 文件夹链结构）。
+  /// 单篇失败会抛出；调用方可改为逐篇 try/catch。
+  Future<void> syncAllDocumentsForUser({
+    required int localUserId,
+    required int forumUserId,
+    required String accessToken,
+  }) async {
+    final documents =
+        await _documentRepository.getAllDocuments(userId: localUserId);
+    for (final document in documents) {
+      await syncDocumentToCommunity(
+        documentId: document.id,
+        localUserId: localUserId,
+        forumUserId: forumUserId,
+        accessToken: accessToken,
+      );
+    }
   }
 
   Future<void> deleteCommunityPost({

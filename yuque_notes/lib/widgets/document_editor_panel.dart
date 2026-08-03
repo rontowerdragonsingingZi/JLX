@@ -28,24 +28,14 @@ class DocumentEditorPanel extends StatefulWidget {
     super.key,
     required this.document,
     required this.onSave,
-    this.canSyncToCommunity = false,
-    this.isSyncedToCommunity,
-    this.onSyncToCommunity,
     this.onBack,
     this.showTitleBar = true,
   });
 
   final models.Document document;
-  final Future<void> Function(String markdown) onSave;
-
-  /// 是否显示「上传云端」按钮（未登录时也应为 true，由回调内要求登录）。
-  final bool canSyncToCommunity;
-
-  /// 是否已同步；默认取 [document.syncedToCommunity]。
-  final bool? isSyncedToCommunity;
-
-  /// 返回 true 表示上传成功；取消登录 / 失败返回 false。
-  final Future<bool> Function()? onSyncToCommunity;
+  /// 保存 Markdown；可返回实际落盘内容（如 Data URI 已换成 R2 URL）。
+  /// 登录状态下由 Workspace 在保存后自动上云，编辑器不再提供手动上传。
+  final Future<String> Function(String markdown) onSave;
 
   /// 手机端返回目录；桌面分栏布局传 null。
   final VoidCallback? onBack;
@@ -62,7 +52,6 @@ class DocumentEditorPanelState extends State<DocumentEditorPanel> {
   late FocusNode _focusNode;
   late ScrollController _scrollController;
   bool _saving = false;
-  bool _syncing = false;
   bool _formatPanelOpen = false;
   bool _draggingExternalFiles = false;
   int _selectedImageWidth = defaultImageWidth;
@@ -103,39 +92,40 @@ class DocumentEditorPanelState extends State<DocumentEditorPanel> {
     super.dispose();
   }
 
-  bool get _isSynced =>
-      widget.isSyncedToCommunity ?? widget.document.syncedToCommunity;
-
-  Future<void> _syncToCommunity() async {
-    final onSync = widget.onSyncToCommunity;
-    if (onSync == null) {
-      return;
-    }
-
-    setState(() => _syncing = true);
-    try {
-      final ok = await onSync();
-      if (ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.uploadedCloud)),
-        );
-      }
-    } catch (_) {
-      // Workspace surfaces the error message.
-    } finally {
-      if (mounted) {
-        setState(() => _syncing = false);
-      }
-    }
-  }
-
   /// 静默保存当前编辑内容（拖拽移动文档前自动落盘，不弹 SnackBar）。
   Future<void> saveSilently() async {
     final markdown = deltaToMarkdown(
       _controller.document,
       imageWidths: _imageWidths,
     );
-    await widget.onSave(markdown);
+    final saved = await widget.onSave(markdown);
+    if (!mounted) {
+      return;
+    }
+    if (saved != markdown) {
+      applyExternalMarkdown(saved);
+    }
+  }
+
+  /// 外部已改写正文（如上云后 Data URI→R2 URL）时刷新编辑器。
+  void applyExternalMarkdown(String markdown) {
+    if (!mounted) {
+      return;
+    }
+    final newWidths = parseAllImageWidths(markdown);
+    setState(() {
+      _imageWidths
+        ..clear()
+        ..addAll(newWidths);
+    });
+    final sel = _controller.selection;
+    _controller.document = markdownToDocument(markdown);
+    final max = _controller.document.length;
+    final offset = sel.baseOffset.clamp(0, max > 0 ? max - 1 : 0);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: offset),
+      ChangeSource.local,
+    );
   }
 
   Future<void> _save() async {
@@ -329,32 +319,13 @@ class DocumentEditorPanelState extends State<DocumentEditorPanel> {
   }
 
   List<Widget> _buildHeaderActions({required bool compact}) {
-    final actions = <Widget>[];
-    if (widget.canSyncToCommunity && widget.onSyncToCommunity != null) {
-      // 图标与未上传一致；已上传仅改文案并禁用，无悬浮提示。
-      actions.add(
-        TextButton.icon(
-          key: _isSynced
-              ? const Key('synced_to_community_badge')
-              : const Key('sync_to_community_button'),
-          onPressed: (_isSynced || _syncing) ? null : _syncToCommunity,
-          icon: _buildBusyIcon(_syncing, Icons.cloud_upload_outlined),
-          label: Text(
-            _isSynced
-                ? context.l10n.uploadedCloud
-                : context.l10n.uploadCloud,
-          ),
-        ),
-      );
-    }
-    actions.add(
+    return [
       TextButton.icon(
         onPressed: _saving ? null : _save,
         icon: _buildBusyIcon(_saving, Icons.save_outlined),
         label: Text(context.l10n.save),
       ),
-    );
-    return actions;
+    ];
   }
 
   /// Windows / 宽屏：完整 Quill 工具条（可用鼠标悬停看说明）。
